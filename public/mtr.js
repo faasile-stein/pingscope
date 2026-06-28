@@ -289,13 +289,18 @@ class MtrMap {
     const placed = [];
     for (const source of this.order) {
       const track = this.tracks.get(source), g = track._geo || [];
+      // Per-leg latency from a monotonic running-max of avg RTT: traceroute RTTs
+      // aren't monotonic (a later hop can read lower), so a raw delta can go
+      // negative. The running max attributes each leg the latency it *adds*,
+      // is never negative, and the legs sum to the end-to-end RTT.
+      let cum = null;
+      const cums = g.map((h) => { const v = h.avg ?? h.last; if (v == null) return cum; cum = cum == null ? v : Math.max(cum, v); return cum; });
       for (let i = 1; i < g.length; i++) {
-        const a = g[i - 1], b = g[i];
-        const va = a.last ?? a.avg, vb = b.last ?? b.avg;
-        if (va == null || vb == null) continue;
-        const d = Math.max(0, vb - va);
-        const pa = project(a.geo.lon, a.geo.lat), pb = project(b.geo.lon, b.geo.lat);
-        this._geoSegLabel(ctx, { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }, `+${d.toFixed(d < 10 ? 1 : 0)}ms`, track.color, placed);
+        if (cums[i] == null || cums[i - 1] == null) continue;
+        const d = cums[i] - cums[i - 1];
+        const txt = d < 0.05 ? '≈0ms' : `+${d.toFixed(d < 10 ? 1 : 0)}ms`;
+        const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
+        this._geoSegLabel(ctx, { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }, txt, track.color, placed);
       }
       for (const h of g) {
         const city = h.geo.city || h.geo.country || '';

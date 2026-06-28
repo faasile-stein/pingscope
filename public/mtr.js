@@ -283,15 +283,23 @@ class MtrMap {
       });
     }
 
-    // routes — each leg coloured by the AS it enters
+    // routes — solid AS colour within an AS; a handoff leg fades from the
+    // leaving AS's colour to the entering AS's colour, marking where the path
+    // crosses between networks.
     for (const source of this.order) {
       const track = this.tracks.get(source), g = track._geo;
       for (let i = 1; i < g.length; i++) {
         const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
-        const col = asColorOf(track._effAsn[i - 1]); // colour by the AS carrying this leg (source)
+        const c1 = asColorOf(track._effAsn[i - 1]), c2 = asColorOf(track._effAsn[i]);
+        let stroke;
+        if (track._effAsn[i - 1] === track._effAsn[i]) { stroke = rgb(c1, 0.9); }
+        else {
+          stroke = ctx.createLinearGradient(pa.x, pa.y, pb.x, pb.y);
+          stroke.addColorStop(0, rgb(c1, 0.92)); stroke.addColorStop(1, rgb(c2, 0.92));
+        }
         ctx.save();
-        ctx.strokeStyle = rgb(col, 0.9); ctx.lineWidth = 2.4; ctx.lineJoin = 'round';
-        ctx.shadowColor = rgb(col, 0.5); ctx.shadowBlur = 7;
+        ctx.strokeStyle = stroke; ctx.lineWidth = 2.4; ctx.lineJoin = 'round';
+        ctx.shadowColor = rgb(c2, 0.45); ctx.shadowBlur = 7;
         ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.restore();
       }
       if (g.length >= 2) this._geoPackets(ctx, g, project, time);

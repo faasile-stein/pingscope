@@ -331,9 +331,14 @@ class MtrMap {
         const asn = g[runStart].geo.asn;
         const egCum = cumByIdx.get(g[i - 1].idx) ?? prevEgressCum;
         const d = Math.max(0, egCum - prevEgressCum);
-        const ms = d < 0.05 ? '≈0' : `+${d.toFixed(d < 10 ? 1 : 0)}`;
-        const org = (g[runStart].geo.org || `AS${asn}`).slice(0, 20);
-        this._geoSegLabel(ctx, project(g[runStart].geo.lon, g[runStart].geo.lat), `→ ${org} ${ms}ms`, asColorOf(asn), placed, true);
+        const ms = d < 0.05 ? '≈0ms' : `${d.toFixed(d < 10 ? 1 : 0)}ms`;
+        const cur = (g[runStart].geo.org || `AS${asn}`).slice(0, 18);
+        const next = i < g.length ? (g[i].geo.org || `AS${g[i].geo.asn}`).slice(0, 18) : 'end';
+        // place at the AS boundary (or the destination for the last AS)
+        let pos;
+        if (i < g.length) { const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat); pos = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }; }
+        else { pos = project(g[i - 1].geo.lon, g[i - 1].geo.lat); }
+        this._geoSegLabel(ctx, pos, `${cur} → ${next}  ${ms}`, asColorOf(asn), placed, true);
         prevEgressCum = egCum; runStart = i;
       }
       for (const h of g) {

@@ -158,6 +158,14 @@ class Graph {
     lane.head = new THREE.Mesh(new THREE.SphereGeometry(1.5, 16, 16), new THREE.MeshBasicMaterial({ color: colorHex }));
     lane.head.visible = false;
 
+    // red vertical markers at every time-point that had packet loss
+    const lossGeo = new THREE.BufferGeometry();
+    lossGeo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(0), 3));
+    lossGeo.setAttribute('color', new THREE.BufferAttribute(new Float32Array(0), 3));
+    lane.lossMarks = new THREE.LineSegments(lossGeo, new THREE.LineBasicMaterial({
+      vertexColors: true, transparent: true, opacity: 0.9, depthWrite: false, blending: THREE.AdditiveBlending,
+    }));
+
     lane.pick = new THREE.Mesh(new THREE.PlaneGeometry(SPAN, HEIGHT), new THREE.MeshBasicMaterial({ visible: false }));
     lane.pick.position.set(0, HEIGHT / 2, 0);
     lane.pick.userData.laneId = p.id;
@@ -166,7 +174,7 @@ class Graph {
     lane.nameSprite.scale.set(26, 6.5, 1);
     lane.nameSprite.position.set(RIGHT + 12, 4, 0);
 
-    group.add(lane.outer.mesh, lane.inner.mesh, lane.line, lane.head, lane.pick, lane.nameSprite);
+    group.add(lane.outer.mesh, lane.inner.mesh, lane.lossMarks, lane.line, lane.head, lane.pick, lane.nameSprite);
     this.world.add(group);
     lane.group = group;
     this.lanes.set(p.id, lane);
@@ -174,6 +182,7 @@ class Graph {
 
   _disposeLane(lane) {
     lane.outer.geo.dispose(); lane.inner.geo.dispose(); lane.line.geometry.dispose();
+    lane.lossMarks.geometry.dispose(); lane.lossMarks.material.dispose();
     if (lane.nameSprite.material.map) lane.nameSprite.material.map.dispose();
     lane.nameSprite.material.dispose();
   }
@@ -302,14 +311,33 @@ class Graph {
     const data = lane.data;
     // collect visible points with valid latency
     const pts = [];
+    const loss = [];   // {x, loss} for every visible sample that dropped packets
     for (const s of data) {
       const age = (end - s.t) / 1000;
       if (age > spanSec + 1 || age < -1) continue;
       const x = RIGHT - age * dxPerSec;
-      if (s.median == null) continue;
+      if (s.loss > 0) loss.push({ x, loss: Math.min(1, s.loss) });
+      if (s.median == null) continue;   // full-loss samples have no latency point
       pts.push({ x, s });
     }
     const n = pts.length;
+
+    // ---- red vertical loss markers (taller + brighter the more was lost) ----
+    const lp = new Float32Array(loss.length * 6);
+    const lpc = new Float32Array(loss.length * 6);
+    for (let i = 0; i < loss.length; i++) {
+      const h = HEIGHT * (0.3 + 0.7 * loss[i].loss);
+      const inten = 0.5 + 0.5 * loss[i].loss;
+      const r = inten, g = 0.18 * inten, b = 0.24 * inten;   // red
+      const o = i * 6;
+      lp[o] = loss[i].x; lp[o + 1] = 0; lp[o + 2] = 0;
+      lp[o + 3] = loss[i].x; lp[o + 4] = h; lp[o + 5] = 0;
+      lpc[o] = r; lpc[o + 1] = g; lpc[o + 2] = b;
+      lpc[o + 3] = r; lpc[o + 4] = g; lpc[o + 5] = b;
+    }
+    setAttr(lane.lossMarks.geometry, 'position', lp, 3);
+    setAttr(lane.lossMarks.geometry, 'color', lpc, 3);
+    lane.lossMarks.geometry.setDrawRange(0, loss.length * 2);
 
     // ---- median line ----
     const lpos = new Float32Array(n * 3);

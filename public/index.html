@@ -97,7 +97,13 @@
         MTR <span class="arrow">⟶</span> <b id="stage-target">—</b>
         <span id="stage-meta" class="stage-meta"></span>
       </div>
-      <button id="stage-close" class="stage-close" title="stop &amp; close">✕</button>
+      <div class="stage-right">
+        <div class="stage-view">
+          <button class="sv on" data-mode="latency">latency</button>
+          <button class="sv" data-mode="geo">geographic</button>
+        </div>
+        <button id="stage-close" class="stage-close" title="stop &amp; close">✕</button>
+      </div>
     </div>
     <canvas id="mtr-canvas"></canvas>
     <div id="mtr-tip" class="mtr-tip hidden"></div>

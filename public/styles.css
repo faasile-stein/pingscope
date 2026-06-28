@@ -331,6 +331,11 @@ body::after {
   width: 30px; height: 30px; cursor: pointer; transition: .15s;
 }
 .stage-close:hover { color: var(--bad); border-color: var(--bad); }
+.stage-right { display: flex; align-items: center; gap: 10px; pointer-events: auto; }
+.stage-view { display: flex; gap: 0; background: rgba(120,150,220,.10); border: 1px solid var(--panel-brd); border-radius: 8px; overflow: hidden; }
+.sv { font-family: var(--mono); font-size: 11px; color: var(--muted); background: transparent; border: none; padding: 5px 11px; cursor: pointer; transition: .15s; }
+.sv:hover { color: var(--txt); }
+.sv.on { color: #04121a; background: var(--accent); font-weight: 700; }
 #mtr-canvas { width: 100%; height: 100%; display: block; cursor: crosshair; touch-action: none; }
 
 /* full-screen takeover: hide the rest of the UI while the latency map is up */

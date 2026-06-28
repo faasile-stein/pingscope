@@ -409,6 +409,11 @@ function closeMtr() {
 
 mtrForm.onsubmit = (e) => { e.preventDefault(); openMtr(mtrIp.value.trim()); };
 stageClose.onclick = closeMtr;
+document.querySelectorAll('.sv').forEach((b) => b.onclick = () => {
+  document.querySelectorAll('.sv').forEach((x) => x.classList.remove('on'));
+  b.classList.add('on');
+  MtrMap.setMode(b.dataset.mode);
+});
 
 function updateStageMeta() {
   const n = MtrMap.order.length;

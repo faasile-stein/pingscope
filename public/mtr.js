@@ -32,11 +32,13 @@ class MtrMap {
     this.order = [];
     this.target = '';
     this.maxAxis = 10;
+    this.mode = 'latency';     // 'latency' | 'geo'
     this.running = false;
     this._raf = null;
     this.onHover = null;
     this.hover = null;
   }
+  setMode(m) { this.mode = m; }
 
   init(canvas) {
     this.canvas = canvas;
@@ -101,19 +103,20 @@ class MtrMap {
     if (!this.W) { this._resize(); return; }
     const time = (performance.now() - this._t0) / 1000;
     ctx.clearRect(0, 0, this.W, this.H);
+    this.hover = null;
+    if (this.mode === 'geo') this._drawGeo(ctx, time);
+    else this._drawLatency(ctx, time);
+  }
 
+  _drawLatency(ctx, time) {
     // global ms axis across all tracks
     let peak = 1;
     for (const t of this.tracks.values()) for (const h of t.hops) if (h.avg != null) peak = Math.max(peak, h.last ?? h.avg);
     this.maxAxis = niceMax(peak * 1.08);
-
     this._drawRuler(ctx);
 
     const n = Math.max(1, this.order.length);
-    const usable = this.H - PAD_TOP - PAD_BOT;
-    const bandH = usable / n;
-    this.hover = null;
-
+    const bandH = (this.H - PAD_TOP - PAD_BOT) / n;
     this.order.forEach((source, i) => {
       const track = this.tracks.get(source);
       const top = PAD_TOP + i * bandH;
@@ -126,6 +129,134 @@ class MtrMap {
       this._drawMiniLabels(ctx, track, pts, top, bandH);
       if (i < n - 1) { ctx.strokeStyle = 'rgba(120,150,220,0.08)'; ctx.beginPath(); ctx.moveTo(0, top + bandH); ctx.lineTo(this.W, top + bandH); ctx.stroke(); }
     });
+  }
+
+  // ---- geographic route view: hops plotted at their city lat/lon ----
+  _drawGeo(ctx, time) {
+    const GL = 24, GR = 24, GT = 56, GB = 26;
+    const all = [];
+    for (const source of this.order) {
+      const track = this.tracks.get(source);
+      track._geo = (track.hops || []).filter((h) => h.geo && h.geo.lat != null && h.geo.lon != null);
+      for (const h of track._geo) all.push({ lon: h.geo.lon, lat: h.geo.lat });
+    }
+    if (!all.length) {
+      ctx.save(); ctx.fillStyle = 'rgba(126,136,171,0.8)'; ctx.font = '13px ui-monospace, Menlo, monospace';
+      ctx.textAlign = 'center'; ctx.fillText('waiting for geolocated hops…', this.W / 2, this.H / 2); ctx.restore();
+      return;
+    }
+    // bounding box (+ margin, minimum span)
+    let lonMin = Infinity, lonMax = -Infinity, latMin = Infinity, latMax = -Infinity;
+    for (const p of all) { lonMin = Math.min(lonMin, p.lon); lonMax = Math.max(lonMax, p.lon); latMin = Math.min(latMin, p.lat); latMax = Math.max(latMax, p.lat); }
+    const cLon = (lonMin + lonMax) / 2, cLat = (latMin + latMax) / 2;
+    const spanLon = Math.max(lonMax - lonMin, 3) * 1.25, spanLat = Math.max(latMax - latMin, 3) * 1.25;
+    lonMin = cLon - spanLon / 2; lonMax = cLon + spanLon / 2; latMin = cLat - spanLat / 2; latMax = cLat + spanLat / 2;
+    const cosLat = Math.cos(cLat * Math.PI / 180) || 1;
+    const W = this.W - GL - GR, H = this.H - GT - GB;
+    const scale = Math.min(W / (spanLon * cosLat), H / spanLat);
+    const drawW = spanLon * cosLat * scale, drawH = spanLat * scale;
+    const ox = GL + (W - drawW) / 2, oy = GT + (H - drawH) / 2;
+    const project = (lon, lat) => ({ x: ox + (lon - lonMin) * cosLat * scale, y: oy + (latMax - lat) * scale });
+
+    this._drawGraticule(ctx, lonMin, lonMax, latMin, latMax, project);
+
+    // routes
+    for (const source of this.order) {
+      const track = this.tracks.get(source), g = track._geo;
+      if (g.length >= 2) {
+        ctx.save();
+        ctx.strokeStyle = rgb(track.color, 0.85); ctx.lineWidth = 2; ctx.lineJoin = 'round';
+        ctx.shadowColor = rgb(track.color, 0.55); ctx.shadowBlur = 8;
+        ctx.beginPath();
+        g.forEach((h, i) => { const p = project(h.geo.lon, h.geo.lat); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
+        ctx.stroke(); ctx.restore();
+        this._geoPackets(ctx, g, project, time);
+      }
+    }
+    // dots + labels
+    const placed = [];
+    for (const source of this.order) {
+      const track = this.tracks.get(source);
+      (track._geo || []).forEach((h, i) => {
+        const p = project(h.geo.lon, h.geo.lat);
+        const hovered = this.hover && this.hover.idx === h.idx && this.hover.source === source;
+        if (this._ptr.inside) {
+          const dx = p.x - this._ptr.x, dy = p.y - this._ptr.y;
+          if (dx * dx + dy * dy < 16 * 16) {
+            this.hover = { source, idx: h.idx, hop: h };
+            if (this.onHover) this.onHover({ hop: h, track: { label: track.label }, cx: this._ptr.cx, cy: this._ptr.cy });
+          }
+        }
+        const col = lossColor(h.loss || 0);
+        ctx.save();
+        ctx.shadowColor = rgb(col, 0.9); ctx.shadowBlur = hovered ? 18 : 11;
+        ctx.fillStyle = rgb(col, 1); ctx.beginPath(); ctx.arc(p.x, p.y, hovered ? 6 : 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.restore();
+        // label: flag + city (de-collided)
+        const city = h.geo.city || (h.geo.country || '');
+        if (city) this._geoLabel(ctx, p, `${flag(h.geo.cc)} ${city}`, col, placed);
+      });
+    }
+    this._geoLegend(ctx);
+  }
+
+  _drawGraticule(ctx, lonMin, lonMax, latMin, latMax, project) {
+    const step = (s) => { const r = s / 6, m = Math.pow(10, Math.floor(Math.log10(r || 1))), n = r / m; return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * m; };
+    const sLon = step(lonMax - lonMin), sLat = step(latMax - latMin);
+    ctx.save();
+    ctx.font = '9px ui-monospace, Menlo, monospace'; ctx.strokeStyle = 'rgba(120,150,220,0.09)'; ctx.fillStyle = 'rgba(126,136,171,0.55)'; ctx.lineWidth = 1;
+    for (let lon = Math.ceil(lonMin / sLon) * sLon; lon <= lonMax; lon += sLon) {
+      const a = project(lon, latMax), b = project(lon, latMin);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.textAlign = 'center'; ctx.fillText(`${lon.toFixed(0)}°`, a.x, this.H - 14);
+    }
+    for (let lat = Math.ceil(latMin / sLat) * sLat; lat <= latMax; lat += sLat) {
+      const a = project(lonMin, lat), b = project(lonMax, lat);
+      ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+      ctx.textAlign = 'left'; ctx.fillText(`${lat.toFixed(0)}°`, a.x + 3, a.y - 3);
+    }
+    ctx.restore();
+  }
+
+  _geoPackets(ctx, g, project, time) {
+    const pts = g.map((h) => project(h.geo.lon, h.geo.lat));
+    ctx.save();
+    for (let k = 0; k < 2; k++) {
+      const t = ((time * 0.25) + k / 2) % 1;
+      const seg = (pts.length - 1) * t, i = Math.min(pts.length - 2, Math.floor(seg)), lt = seg - i;
+      const a = pts[i], b = pts[i + 1];
+      const x = a.x + (b.x - a.x) * lt, y = a.y + (b.y - a.y) * lt;
+      ctx.beginPath(); ctx.fillStyle = 'rgba(255,255,255,0.9)'; ctx.shadowColor = 'rgba(120,220,255,0.9)'; ctx.shadowBlur = 10;
+      ctx.arc(x, y, 2.4, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  _geoLabel(ctx, p, text, col, placed) {
+    ctx.font = '10.5px ui-monospace, Menlo, monospace';
+    const w = ctx.measureText(text).width + 10, H = 15;
+    let by = p.y - 10 - H;
+    let cand = { x: Math.max(2, Math.min(this.W - w - 2, p.x - w / 2)), y: by, w, h: H }, guard = 0, dir = -1;
+    while (placed.some((b) => boxOverlap(b, cand, 3)) && guard++ < 24) { by += dir * 7; if (by < 30) { dir = 1; by = p.y + 10; } cand = { ...cand, y: by }; }
+    placed.push(cand);
+    ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    roundRect(ctx, cand.x, cand.y, w, H, 5); ctx.fillStyle = 'rgba(9,12,22,0.8)'; ctx.fill();
+    ctx.strokeStyle = rgb(col, 0.35); ctx.stroke();
+    ctx.fillStyle = 'rgba(231,236,255,0.95)'; ctx.fillText(text, cand.x + 5, cand.y + H / 2);
+    ctx.restore();
+  }
+
+  _geoLegend(ctx) {
+    ctx.save(); ctx.font = '11px ui-monospace, Menlo, monospace'; ctx.textBaseline = 'middle';
+    let y = 64;
+    for (const source of this.order) {
+      const track = this.tracks.get(source);
+      ctx.fillStyle = rgb(track.color, 1); ctx.beginPath(); ctx.arc(this.W - 16, y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(206,214,240,0.9)';
+      ctx.fillText(track.label.slice(0, 28), this.W - 26, y);
+      y += 18;
+    }
+    ctx.restore();
   }
 
   _layoutTrack(track, top, bandH) {

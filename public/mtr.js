@@ -44,18 +44,63 @@ class MtrMap {
     this.canvas = canvas;
     this.ctx = canvas.getContext('2d');
     this._ptr = { x: -1, y: -1, cx: 0, cy: 0, inside: false };
-    const setPtr = (e) => {
-      const r = canvas.getBoundingClientRect();
-      this._ptr = { x: e.clientX - r.left, y: e.clientY - r.top, cx: e.clientX, cy: e.clientY, inside: true };
-    };
-    canvas.addEventListener('pointermove', setPtr);
-    canvas.addEventListener('pointerdown', setPtr);
+    // geo pan/zoom state: auto-fit until the user interacts, then free transform
+    this.geoView = { z: 1, tx: 0, ty: 0, interacted: false, base: null };
+    this._pointers = new Map();
+    this._gesturePrev = null;
+
+    const xy = (e) => { const r = canvas.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+    const setPtr = (e) => { const p = xy(e); this._ptr = { x: p.x, y: p.y, cx: e.clientX, cy: e.clientY, inside: true }; };
+
+    canvas.addEventListener('pointermove', (e) => {
+      setPtr(e);
+      if (this._pointers.has(e.pointerId)) this._pointers.set(e.pointerId, xy(e));
+      this._handleGesture();
+    });
+    canvas.addEventListener('pointerdown', (e) => {
+      setPtr(e);
+      this._pointers.set(e.pointerId, xy(e));
+      this._gesturePrev = null;          // start a fresh gesture
+      try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    });
+    const endPtr = (e) => { this._pointers.delete(e.pointerId); if (!this._pointers.size) this._gesturePrev = null; };
+    canvas.addEventListener('pointerup', endPtr);
+    canvas.addEventListener('pointercancel', endPtr);
     canvas.addEventListener('pointerleave', (e) => {
+      endPtr(e);
       if (e.pointerType && e.pointerType !== 'mouse') return;
       this._ptr.inside = false; this.hover = null;
       if (this.onHover) this.onHover(null);
     });
+    canvas.addEventListener('wheel', (e) => {
+      if (this.mode !== 'geo') return;
+      e.preventDefault();
+      const p = xy(e);
+      this._zoomAround(p.x, p.y, Math.exp(-e.deltaY * 0.0015));
+    }, { passive: false });
+    canvas.addEventListener('dblclick', () => this._resetGeoView());
+
     window.addEventListener('resize', () => this._resize());
+  }
+
+  _resetGeoView() { this.geoView = { z: 1, tx: 0, ty: 0, interacted: false, base: null }; }
+  _zoomAround(cx, cy, f) {
+    const V = this.geoView;
+    V.tx = cx - (cx - V.tx) * f; V.ty = cy - (cy - V.ty) * f; V.z *= f; V.interacted = true;
+  }
+  _handleGesture() {
+    if (this.mode !== 'geo' || !this._pointers.size) { this._gesturePrev = null; return; }
+    const pts = [...this._pointers.values()];
+    const cx = pts.reduce((a, p) => a + p.x, 0) / pts.length;
+    const cy = pts.reduce((a, p) => a + p.y, 0) / pts.length;
+    const spread = pts.length >= 2 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0;
+    const prev = this._gesturePrev;
+    if (prev) {
+      const V = this.geoView;
+      V.tx += cx - prev.cx; V.ty += cy - prev.cy; V.interacted = true;   // pan
+      if (spread > 0 && prev.spread > 0) this._zoomAround(cx, cy, spread / prev.spread); // pinch
+    }
+    this._gesturePrev = { cx, cy, spread };
   }
 
   open(target) {
@@ -64,6 +109,7 @@ class MtrMap {
     this.order = [];
     this.running = true;
     this._t0 = performance.now();
+    this._resetGeoView();
     this._resize();
     if (!this._raf) this._loop();
   }
@@ -175,9 +221,23 @@ class MtrMap {
     const scale = Math.min(W / (spanLon * cosLat), H / spanLat);
     const drawW = spanLon * cosLat * scale, drawH = spanLat * scale;
     const ox = GL + (W - drawW) / 2, oy = GT + (H - drawH) / 2;
-    const project = (lon, lat) => ({ x: ox + (lon - lonMin) * cosLat * scale, y: oy + (latMax - lat) * scale });
+    // auto-fit base; freeze it on first user interaction so pan/zoom is stable
+    const liveBase = { lonMin, latMax, cosLat, scale, ox, oy };
+    if (this.geoView.interacted && !this.geoView.base) this.geoView.base = liveBase;
+    const B = this.geoView.interacted ? this.geoView.base : liveBase;
+    const V = this.geoView;
+    const project = (lon, lat) => ({
+      x: (B.ox + (lon - B.lonMin) * B.cosLat * B.scale) * V.z + V.tx,
+      y: (B.oy + (B.latMax - lat) * B.scale) * V.z + V.ty,
+    });
+    const unproject = (x, y) => ({
+      lon: B.lonMin + (((x - V.tx) / V.z) - B.ox) / (B.cosLat * B.scale),
+      lat: B.latMax - (((y - V.ty) / V.z) - B.oy) / B.scale,
+    });
 
-    this._drawGraticule(ctx, lonMin, lonMax, latMin, latMax, project);
+    // graticule covering the currently visible area (so it stays correct when zoomed)
+    const c1 = unproject(GL, GT), c2 = unproject(this.W - GR, this.H - GB);
+    this._drawGraticule(ctx, Math.min(c1.lon, c2.lon), Math.max(c1.lon, c2.lon), Math.min(c1.lat, c2.lat), Math.max(c1.lat, c2.lat), project);
 
     // white country contours (basemap), clipped to the map area
     if (this._borders && this._borders.length) {
@@ -205,14 +265,13 @@ class MtrMap {
         this._geoPackets(ctx, g, project, time);
       }
     }
-    // dots + labels
-    const placed = [];
+    // dots + hover (no hover-pick while panning/zooming)
     for (const source of this.order) {
       const track = this.tracks.get(source);
-      (track._geo || []).forEach((h, i) => {
+      for (const h of (track._geo || [])) {
         const p = project(h.geo.lon, h.geo.lat);
         const hovered = this.hover && this.hover.idx === h.idx && this.hover.source === source;
-        if (this._ptr.inside) {
+        if (this._ptr.inside && !this._pointers.size) {
           const dx = p.x - this._ptr.x, dy = p.y - this._ptr.y;
           if (dx * dx + dy * dy < 16 * 16) {
             this.hover = { source, idx: h.idx, hop: h };
@@ -224,12 +283,49 @@ class MtrMap {
         ctx.shadowColor = rgb(col, 0.9); ctx.shadowBlur = hovered ? 18 : 11;
         ctx.fillStyle = rgb(col, 1); ctx.beginPath(); ctx.arc(p.x, p.y, hovered ? 6 : 4.5, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-        // label: flag + city (de-collided)
-        const city = h.geo.city || (h.geo.country || '');
-        if (city) this._geoLabel(ctx, p, `${flag(h.geo.cc)} ${city}`, col, placed);
-      });
+      }
+    }
+    // labels: per-segment latency at each leg's midpoint + city names at hops
+    const placed = [];
+    for (const source of this.order) {
+      const track = this.tracks.get(source), g = track._geo || [];
+      for (let i = 1; i < g.length; i++) {
+        const a = g[i - 1], b = g[i];
+        const va = a.last ?? a.avg, vb = b.last ?? b.avg;
+        if (va == null || vb == null) continue;
+        const d = Math.max(0, vb - va);
+        const pa = project(a.geo.lon, a.geo.lat), pb = project(b.geo.lon, b.geo.lat);
+        this._geoSegLabel(ctx, { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }, `+${d.toFixed(d < 10 ? 1 : 0)}ms`, track.color, placed);
+      }
+      for (const h of g) {
+        const city = h.geo.city || h.geo.country || '';
+        if (city) this._geoLabel(ctx, project(h.geo.lon, h.geo.lat), `${flag(h.geo.cc)} ${city}`, lossColor(h.loss || 0), placed);
+      }
     }
     this._geoLegend(ctx);
+    this._geoHint(ctx);
+  }
+
+  _geoSegLabel(ctx, mid, text, color, placed) {
+    ctx.font = 'bold 10px ui-monospace, Menlo, monospace';
+    const w = ctx.measureText(text).width + 8, H = 14;
+    let by = mid.y - H / 2;
+    let cand = { x: Math.max(2, Math.min(this.W - w - 2, mid.x - w / 2)), y: by, w, h: H }, guard = 0, dir = -1;
+    while (placed.some((b) => boxOverlap(b, cand, 3)) && guard++ < 20) { by += dir * 8; if (by < 30) { dir = 1; by = mid.y + H; } cand = { ...cand, y: by }; }
+    placed.push(cand);
+    ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    roundRect(ctx, cand.x, cand.y, w, H, 5); ctx.fillStyle = 'rgba(7,10,18,0.85)'; ctx.fill();
+    ctx.strokeStyle = rgb(color, 0.6); ctx.lineWidth = 1; ctx.stroke();
+    ctx.fillStyle = rgb(color, 1); ctx.fillText(text, cand.x + 4, cand.y + H / 2);
+    ctx.restore();
+  }
+
+  _geoHint(ctx) {
+    ctx.save();
+    ctx.font = '10px ui-monospace, Menlo, monospace';
+    ctx.fillStyle = 'rgba(126,136,171,0.7)'; ctx.textAlign = 'right';
+    ctx.fillText('scroll / pinch to zoom · drag to pan · double-click to fit', this.W - 12, this.H - 10);
+    ctx.restore();
   }
 
   _drawGraticule(ctx, lonMin, lonMax, latMin, latMax, project) {

@@ -23,6 +23,10 @@ function niceMax(v) {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
 }
 
+// distinct colours for ASes traversed (route segments + legend)
+const AS_PALETTE = ['#4ad8ff', '#ff8a3d', '#b78bff', '#36f1a3', '#ffd23f', '#ff6ad5', '#5b8cff', '#9aff66', '#ff5d6c', '#42e8d4'];
+const hexRGB = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
+
 const PAD_L = 60, PAD_R = 52, PAD_TOP = 54, PAD_BOT = 40;
 const HEADER_H = 18;
 
@@ -109,6 +113,7 @@ class MtrMap {
     this.order = [];
     this.running = true;
     this._t0 = performance.now();
+    this._asColor = new Map();
     this._resetGeoView();
     this._resize();
     if (!this._raf) this._loop();
@@ -252,20 +257,33 @@ class MtrMap {
       ctx.restore();
     }
 
-    // routes
+    // assign a stable colour per AS, in path order, for the route + legend
+    this._asColor = this._asColor || new Map();
+    const asColorOf = (asn) => {
+      if (!asn) return [120, 130, 160];
+      if (!this._asColor.has(asn)) this._asColor.set(asn, hexRGB(AS_PALETTE[this._asColor.size % AS_PALETTE.length]));
+      return this._asColor.get(asn);
+    };
+    const asOrder = [], asOrg = new Map();
+    for (const source of this.order) for (const h of (this.tracks.get(source)._geo || [])) {
+      const asn = h.geo.asn; if (!asn) continue;
+      if (!asOrg.has(asn)) { asOrg.set(asn, h.geo.org || `AS${asn}`); asOrder.push(asn); asColorOf(asn); }
+    }
+
+    // routes — each leg coloured by the AS it enters
     for (const source of this.order) {
       const track = this.tracks.get(source), g = track._geo;
-      if (g.length >= 2) {
+      for (let i = 1; i < g.length; i++) {
+        const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
+        const col = asColorOf(g[i].geo.asn);
         ctx.save();
-        ctx.strokeStyle = rgb(track.color, 0.85); ctx.lineWidth = 2; ctx.lineJoin = 'round';
-        ctx.shadowColor = rgb(track.color, 0.55); ctx.shadowBlur = 8;
-        ctx.beginPath();
-        g.forEach((h, i) => { const p = project(h.geo.lon, h.geo.lat); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); });
-        ctx.stroke(); ctx.restore();
-        this._geoPackets(ctx, g, project, time);
+        ctx.strokeStyle = rgb(col, 0.9); ctx.lineWidth = 2.4; ctx.lineJoin = 'round';
+        ctx.shadowColor = rgb(col, 0.5); ctx.shadowBlur = 7;
+        ctx.beginPath(); ctx.moveTo(pa.x, pa.y); ctx.lineTo(pb.x, pb.y); ctx.stroke(); ctx.restore();
       }
+      if (g.length >= 2) this._geoPackets(ctx, g, project, time);
     }
-    // dots + hover (no hover-pick while panning/zooming)
+    // dots: loss-coloured fill + AS-coloured ring; hover-pick when not panning
     for (const source of this.order) {
       const track = this.tracks.get(source);
       for (const h of (track._geo || [])) {
@@ -278,10 +296,12 @@ class MtrMap {
             if (this.onHover) this.onHover({ hop: h, track: { label: track.label }, cx: this._ptr.cx, cy: this._ptr.cy });
           }
         }
-        const col = lossColor(h.loss || 0);
+        const col = lossColor(h.loss || 0), as = asColorOf(h.geo.asn), r = hovered ? 6 : 4.5;
         ctx.save();
+        ctx.strokeStyle = rgb(as, 0.95); ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2); ctx.stroke();
         ctx.shadowColor = rgb(col, 0.9); ctx.shadowBlur = hovered ? 18 : 11;
-        ctx.fillStyle = rgb(col, 1); ctx.beginPath(); ctx.arc(p.x, p.y, hovered ? 6 : 4.5, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = rgb(col, 1); ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
       }
     }
@@ -315,7 +335,7 @@ class MtrMap {
           const org = (B.geo.org || `AS${B.geo.asn}`).slice(0, 20);
           this._geoSegLabel(ctx, mid, `→ ${org} ${ms}ms`, [255, 210, 63], placed, true);
         } else {
-          this._geoSegLabel(ctx, mid, `${ms}ms`, track.color, placed, false);
+          this._geoSegLabel(ctx, mid, `${ms}ms`, asColorOf(B.geo.asn), placed, false);
         }
       }
       for (const h of g) {
@@ -323,8 +343,35 @@ class MtrMap {
         if (city) this._geoLabel(ctx, project(h.geo.lon, h.geo.lat), `${flag(h.geo.cc)} ${city}`, lossColor(h.loss || 0), placed);
       }
     }
+    this._geoAsLegend(ctx, asOrder, asOrg, asColorOf);
     this._geoLegend(ctx);
     this._geoHint(ctx);
+  }
+
+  // Legend of the ASes traversed, in path order, with their route colours.
+  _geoAsLegend(ctx, asOrder, asOrg, colorOf) {
+    if (!asOrder.length) return;
+    ctx.save();
+    ctx.font = '11px ui-monospace, Menlo, monospace';
+    const rows = asOrder.map((asn) => `AS${asn} ${(asOrg.get(asn) || '').slice(0, 24)}`);
+    let w = 0; for (const r of rows) w = Math.max(w, ctx.measureText(r).width);
+    w += 34;
+    const rowH = 18, x = 14, top = this.H - 24 - rows.length * rowH;
+    roundRect(ctx, x, top, w, rows.length * rowH + 24, 9);
+    ctx.fillStyle = 'rgba(9,12,22,0.82)'; ctx.fill();
+    ctx.strokeStyle = 'rgba(120,150,220,0.18)'; ctx.lineWidth = 1; ctx.stroke();
+    ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
+    ctx.fillStyle = 'rgba(126,136,171,0.85)';
+    ctx.fillText('ASN PATH', x + 12, top + 14);
+    asOrder.forEach((asn, i) => {
+      const y = top + 30 + i * rowH;
+      const col = colorOf(asn);
+      ctx.strokeStyle = rgb(col, 1); ctx.lineWidth = 3;
+      ctx.beginPath(); ctx.moveTo(x + 10, y); ctx.lineTo(x + 24, y); ctx.stroke();
+      ctx.fillStyle = 'rgba(214,222,245,0.95)';
+      ctx.fillText(rows[i], x + 32, y);
+    });
+    ctx.restore();
   }
 
   _geoSegLabel(ctx, mid, text, color, placed, prominent = false) {

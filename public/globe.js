@@ -54,10 +54,12 @@ class Globe {
     this.controls = new OrbitControls(this.camera, canvas);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.minDistance = 1.45;
-    this.controls.maxDistance = 6;
+    this.controls.minDistance = 1.07;   // zoom right down to the surface
+    this.controls.maxDistance = 10;
     this.controls.enablePan = false;
     this.controls.autoRotateSpeed = 0.4;
+    this.controls.zoomSpeed = 0.9;
+    this._zoomBuilt = 1;                 // camera-distance factor the tubes were built at
 
     this.world = new THREE.Group();
     this.scene.add(this.world);
@@ -164,7 +166,8 @@ class Globe {
       }
       const curve = new THREE.CatmullRomCurve3(pts);
       const spread = Math.max(0, p.spread || 0);
-      const radius = 0.004 + 0.016 * Math.min(1, spread / 35);   // thickness ~ variance
+      const varRadius = 0.004 + 0.016 * Math.min(1, spread / 35);   // base thickness ~ variance
+      const radius = varRadius * this._zoomFactor();                // scaled to keep apparent width steady
       const col = lossColor(p.loss || 0);
       const mesh = new THREE.Mesh(
         new THREE.TubeGeometry(curve, N, radius, 9, false),
@@ -175,6 +178,7 @@ class Globe {
 
       const dot = new THREE.Mesh(new THREE.SphereGeometry(0.014, 14, 14), new THREE.MeshBasicMaterial({ color: col }));
       dot.position.copy(latlon3(p.lat, p.lon, R * 1.012));
+      dot.scale.setScalar(this._dotScale());
       this.markerGroup.add(dot);
 
       const labelEl = document.createElement('div');
@@ -187,8 +191,30 @@ class Globe {
       labelEl.addEventListener('click', (e) => { e.stopPropagation(); this.onSelect && this.onSelect(p); });
       this.labelLayer.appendChild(labelEl);
 
-      this.arcs.set(p.id, { mesh, dot, labelEl, apex: pts[N / 2].clone(), dstN: end.clone().normalize(), probe: p, baseOpacity: 0.9 });
+      this.arcs.set(p.id, { mesh, dot, labelEl, curve, seg: N, varRadius, apex: pts[N / 2].clone(), dstN: end.clone().normalize(), probe: p, baseOpacity: 0.9 });
     }
+    this._zoomBuilt = this._zoomFactor();
+  }
+
+  // Tube/marker scale tied to camera distance, so lines keep a roughly constant
+  // on-screen thickness instead of ballooning as you zoom in.
+  _zoomFactor() {
+    const d = this.camera.position.distanceTo(this.controls.target);
+    return Math.min(2.4, Math.max(0.28, d / 3));
+  }
+  _dotScale() { return Math.min(1.8, Math.max(0.4, this._zoomFactor())); }
+
+  // rebuild tube geometries (and rescale dots) when the zoom changed enough
+  _applyZoom() {
+    const f = this._zoomFactor();
+    const ds = this._dotScale();
+    if (this.originMarker) this.originMarker.scale.setScalar(ds);
+    for (const a of this.arcs.values()) {
+      a.dot.scale.setScalar(ds);
+      a.mesh.geometry.dispose();
+      a.mesh.geometry = new THREE.TubeGeometry(a.curve, a.seg, a.varRadius * f, 9, false);
+    }
+    this._zoomBuilt = f;
   }
 
   _updateLabels() {
@@ -262,6 +288,9 @@ class Globe {
     if (!this._visible) { this._raf = null; return; }
     this.controls.autoRotate = this.autoRotate;
     this.controls.update();
+    // adapt line thickness to zoom (rebuild only when it changed materially)
+    const f = this._zoomFactor();
+    if (this.arcs.size && Math.abs(f - this._zoomBuilt) / this._zoomBuilt > 0.05) this._applyZoom();
     if (this._originHalo) this._originHalo.material.opacity = 0.2 + 0.12 * (0.5 + 0.5 * Math.sin(Date.now() / 380));
     this.renderer.render(this.scene, this.camera);
     this._updateLabels();   // reposition ms labels each frame (globe rotates)

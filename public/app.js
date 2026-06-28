@@ -413,18 +413,20 @@ function closeMtr() {
 
 mtrForm.onsubmit = (e) => { e.preventDefault(); openMtr(mtrIp.value.trim()); };
 stageClose.onclick = closeMtr;
-document.querySelectorAll('.sv').forEach((b) => b.onclick = () => {
-  document.querySelectorAll('.sv').forEach((x) => x.classList.remove('on'));
-  b.classList.add('on');
-  MtrMap.setMode(b.dataset.mode);
-});
+function setMtrView(mode) {
+  MtrMap.setMode(mode);
+  document.querySelectorAll('.sv').forEach((x) => x.classList.toggle('on', x.dataset.mode === mode));
+}
+document.querySelectorAll('.sv').forEach((b) => b.onclick = () => setMtrView(b.dataset.mode));
 
 // ---- shareable MTR views ----
 const shareBtn = document.getElementById('stage-share');
 shareBtn.onclick = async () => {
   if (!currentMtrTarget) return;
   const keys = [...new Set([...state.vantages].map((id) => (state.agentById.get(id) || {}).key).filter(Boolean))];
-  const url = `${location.origin}/?mtr=${encodeURIComponent(currentMtrTarget)}` + (keys.length ? `&vp=${encodeURIComponent(keys.join(','))}` : '');
+  const url = `${location.origin}/?mtr=${encodeURIComponent(currentMtrTarget)}`
+    + (keys.length ? `&vp=${encodeURIComponent(keys.join(','))}` : '')
+    + (MtrMap.mode === 'geo' ? '&view=geo' : '');
   try { await navigator.clipboard.writeText(url); } catch { /* clipboard blocked */ }
   shareBtn.textContent = '✓ link copied'; shareBtn.classList.add('copied');
   setTimeout(() => { shareBtn.textContent = '⤴ share'; shareBtn.classList.remove('copied'); }, 1600);
@@ -441,6 +443,7 @@ function applyShareParams() {
   renderVantages();
   mtrIp.value = t;
   openMtr(t);
+  if (p.get('view') === 'geo') setMtrView('geo');
 }
 
 function updateStageMeta() {

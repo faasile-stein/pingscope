@@ -1,0 +1,15 @@
+{
+  "name": "pingscope",
+  "version": "1.0.0",
+  "description": "Live latency observatory — a modern SmokePing with a 3D Three.js visualisation",
+  "type": "commonjs",
+  "main": "server.js",
+  "scripts": {
+    "start": "node --experimental-sqlite server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "maxmind": "^4.3.24",
+    "ws": "^8.18.0"
+  }
+}

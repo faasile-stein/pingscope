@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PingScope · live latency observatory</title>
+  <link rel="preconnect" href="https://unpkg.com" />
+  <link rel="stylesheet" href="./styles.css" />
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+  <canvas id="scene"></canvas>
+
+  <header id="topbar">
+    <button id="menu-toggle" class="menu-toggle" aria-label="toggle probes">☰</button>
+    <div class="brand">
+      <span class="logo">◵</span>
+      <div>
+        <h1>PINGSCOPE</h1>
+        <p class="sub">live latency observatory · smokeping reimagined</p>
+      </div>
+    </div>
+    <div class="status">
+      <span id="conn-dot" class="dot"></span>
+      <span id="conn-text">connecting…</span>
+    </div>
+  </header>
+
+  <div id="sel-backdrop" class="sel-backdrop"></div>
+
+  <section id="selector">
+    <div class="sel-head">
+      <input id="sel-search" type="text" placeholder="filter probes…" spellcheck="false" />
+      <div class="sel-tabs">
+        <button class="sel-tab on" data-type="all">all</button>
+        <button class="sel-tab" data-type="dns">dns</button>
+        <button class="sel-tab" data-type="isp">isp</button>
+        <button class="sel-tab" data-type="cloud">cloud</button>
+      </div>
+      <div class="sel-bar"><span id="sel-count">0 / 0</span><button id="sel-clear">clear</button></div>
+    </div>
+    <div id="sel-list"></div>
+  </section>
+
+  <nav id="timemachine">
+    <button class="tm live on" data-range="live">● LIVE</button>
+    <span class="tm-sep"></span>
+    <button class="tm" data-range="3600000">1h</button>
+    <button class="tm" data-range="21600000">6h</button>
+    <button class="tm" data-range="86400000">24h</button>
+    <button class="tm" data-range="604800000">7d</button>
+    <button class="tm" data-range="2592000000">30d</button>
+    <span class="tm-sep"></span>
+    <button class="tm nav" id="tm-prev" title="pan back" disabled>◀</button>
+    <button class="tm nav" id="tm-next" title="pan forward" disabled>▶</button>
+    <span id="tm-label" class="tm-label">streaming live</span>
+  </nav>
+
+  <div id="hud">
+    <div class="hud-row">
+      <span class="hud-key">drag</span> orbit
+      <span class="hud-key">scroll</span> zoom
+      <span class="hud-key">right-drag</span> pan
+    </div>
+    <div class="hud-row controls">
+      <button id="btn-rotate" class="toggle on">auto-rotate</button>
+      <button id="btn-pause" class="toggle">pause feed</button>
+      <label class="range">window
+        <input id="window-range" type="range" min="30" max="300" step="10" value="120" />
+        <span id="window-val">120s</span>
+      </label>
+    </div>
+  </div>
+
+  <section id="mtrpanel">
+    <div class="mtr-head">
+      <span class="mtr-title">⊹ mtr</span>
+      <form id="mtr-form" autocomplete="off">
+        <input id="mtr-ip" type="text" placeholder="IP or host to trace…" spellcheck="false" />
+        <button type="submit" id="mtr-go">▶ run</button>
+      </form>
+    </div>
+    <div id="mtr-vantages" class="mtr-vantages"></div>
+  </section>
+
+  <div id="mtr-stage" class="mtr-stage hidden">
+    <div class="stage-head">
+      <div class="stage-title">
+        <span class="pulse-dot"></span>
+        MTR <span class="arrow">⟶</span> <b id="stage-target">—</b>
+        <span id="stage-meta" class="stage-meta"></span>
+      </div>
+      <button id="stage-close" class="stage-close" title="stop &amp; close">✕</button>
+    </div>
+    <canvas id="mtr-canvas"></canvas>
+    <div id="mtr-tip" class="mtr-tip hidden"></div>
+  </div>
+
+  <div id="readout" class="readout hidden"></div>
+
+  <script type="module" src="./graph.js"></script>
+  <script type="module" src="./mtr.js"></script>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

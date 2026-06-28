@@ -1,0 +1,16 @@
+services:
+  pingscope:
+    build: .
+    container_name: pingscope
+    ports:
+      - "3000:3000"
+    volumes:
+      # named volume → ping history is retained across restarts/rebuilds
+      - pingscope-data:/data
+    cap_add:
+      # raw sockets for ICMP ping + traceroute
+      - NET_RAW
+    restart: unless-stopped
+
+volumes:
+  pingscope-data:

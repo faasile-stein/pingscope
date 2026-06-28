@@ -1,0 +1,18 @@
+services:
+  pingscope-agent:
+    build: .
+    image: pingscope-agent
+    container_name: pingscope-agent
+    restart: unless-stopped
+    # only raw sockets for mtr; everything else dropped
+    cap_drop: ["ALL"]
+    cap_add: ["NET_RAW"]
+    read_only: true
+    security_opt: ["no-new-privileges:true"]
+    environment:
+      # ask the maintainer for the community token, then put it here (or in a .env file)
+      AGENT_TOKEN: "${AGENT_TOKEN:?set AGENT_TOKEN}"
+      # optional public label shown next to your country + AS (no personal info, please)
+      AGENT_NAME: "${AGENT_NAME:-}"
+      # override only if you run your own PingScope server
+      PINGSCOPE_URL: "${PINGSCOPE_URL:-wss://pingscope.net/agent}"

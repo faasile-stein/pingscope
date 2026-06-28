@@ -1,0 +1,10 @@
+node_modules
+data
+*.db
+*.db-wal
+*.db-shm
+npm-debug.log
+.git
+.DS_Store
+geo/
+*.mmdb

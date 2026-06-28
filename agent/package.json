@@ -1,0 +1,9 @@
+{
+  "name": "pingscope-agent",
+  "version": "1.0.0",
+  "description": "PingScope community probe agent — a home vantage point for distributed MTR",
+  "type": "commonjs",
+  "main": "agent.js",
+  "scripts": { "start": "node agent.js" },
+  "dependencies": { "ws": "^8.18.0" }
+}

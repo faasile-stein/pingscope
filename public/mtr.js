@@ -23,6 +23,15 @@ function niceMax(v) {
   return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 5 ? 5 : 10) * mag;
 }
 
+// great-circle distance in km between two lat/lon points
+function haversineKm(lat1, lon1, lat2, lon2) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (lat2 - lat1) * rad, dLon = (lon2 - lon1) * rad;
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * rad) * Math.cos(lat2 * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.min(1, Math.sqrt(a)));
+}
+const LIGHT_KM_S = 299792; // speed of light, km/s
+
 // distinct colours for ASes traversed (route segments + legend)
 const AS_PALETTE = ['#4ad8ff', '#ff8a3d', '#b78bff', '#36f1a3', '#ffd23f', '#ff6ad5', '#5b8cff', '#9aff66', '#ff5d6c', '#42e8d4'];
 const hexRGB = (h) => { const n = parseInt(h.slice(1), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; };
@@ -200,6 +209,30 @@ class MtrMap {
       .catch(() => { this._borders = []; }); // no basemap → graticule only
   }
 
+  // Drop geolocated hops that are physically impossible: if reaching a hop from
+  // the previous kept hop would need the packet to exceed 2× light speed, its
+  // geolocation is bogus (common for backbone/anycast IPs). We compare the
+  // great-circle distance against the time the cumulative RTT allows (one-way ≈
+  // ΔRTT/2). The first and last hop are always kept; a dropped hop's latency
+  // survives because the running-max cum carries it to the next kept hop.
+  _filterImpossibleGeo(geo, cumByIdx) {
+    if (geo.length <= 2) return geo;
+    const kept = [];
+    let prev = null;
+    for (let i = 0; i < geo.length; i++) {
+      const h = geo[i];
+      if (i === geo.length - 1) { kept.push(h); break; } // always keep the destination
+      if (!prev) { kept.push(h); prev = h; continue; }   // always keep the first
+      const d = haversineKm(prev.geo.lat, prev.geo.lon, h.geo.lat, h.geo.lon);
+      const dRtt = (cumByIdx.get(h.idx) ?? 0) - (cumByIdx.get(prev.idx) ?? 0); // ms, round-trip
+      const oneWaySec = (dRtt / 2) / 1000;
+      const speed = oneWaySec > 0 ? d / oneWaySec : Infinity; // km/s
+      if (d > 100 && speed > 2 * LIGHT_KM_S) continue;   // impossible — drop, keep its ms
+      kept.push(h); prev = h;
+    }
+    return kept;
+  }
+
   // ---- geographic route view: hops plotted at their city lat/lon ----
   _drawGeo(ctx, time) {
     this._ensureBorders();
@@ -207,7 +240,17 @@ class MtrMap {
     const all = [];
     for (const source of this.order) {
       const track = this.tracks.get(source);
-      track._geo = (track.hops || []).filter((h) => h.geo && h.geo.lat != null && h.geo.lon != null);
+      // cumulative RTT (monotonic running-max of avg) over ALL responding hops —
+      // drives both the per-leg latency and the speed-of-light sanity filter.
+      const cumByIdx = new Map(); let cum = null;
+      for (const h of track.hops) { const v = h.avg ?? h.last; if (v != null) cum = cum == null ? v : Math.max(cum, v); cumByIdx.set(h.idx, cum); }
+      track._cumByIdx = cumByIdx;
+      const geo = (track.hops || []).filter((h) => h.geo && h.geo.lat != null && h.geo.lon != null);
+      // Drop hops whose location is physically impossible (the packet would have
+      // to travel >2× light speed to get there from the previous kept hop) — many
+      // backbone/anycast IPs are mis-geolocated. Their latency is preserved (the
+      // running-max cum carries it to the next kept hop); the destination is kept.
+      track._geo = this._filterImpossibleGeo(geo, cumByIdx);
       for (const h of track._geo) all.push({ lon: h.geo.lon, lat: h.geo.lat });
       // effective ASN: a hop with no ASN is folded into the NEXT AS in the path
       // (so it never shows as its own "ASnull"); falls back to the previous AS.
@@ -330,17 +373,11 @@ class MtrMap {
     const placed = [];
     for (const source of this.order) {
       const track = this.tracks.get(source), g = track._geo || [];
-      // Per-leg latency from a monotonic running-max of avg RTT over ALL
-      // responding hops — including private/unlocated ones that aren't drawn —
-      // so a filtered-out hop's latency is still attributed to the leg it sits
-      // on. (Traceroute RTTs aren't monotonic, so the running max keeps legs
-      // non-negative; they sum to the end-to-end RTT.)
-      const cumByIdx = new Map(); let cum = null;
-      for (const h of track.hops) {
-        const v = h.avg ?? h.last;
-        if (v != null) cum = cum == null ? v : Math.max(cum, v);
-        cumByIdx.set(h.idx, cum);
-      }
+      // Per-leg latency from the monotonic running-max cum (computed up top over
+      // ALL responding hops, incl. private/unlocated and filtered-out ones) — so a
+      // dropped hop's latency is still attributed to the next kept leg. They sum to
+      // the end-to-end RTT. (Per-hop detail is on hover.)
+      const cumByIdx = track._cumByIdx;
       // Per-AS latency, attributed by EGRESS: each AS = cumulative RTT at its last
       // hop minus the previous AS's last hop. So a network is credited with
       // carrying the packet across its own footprint (incl. long-haul to the

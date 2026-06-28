@@ -1,8 +1,10 @@
 import Graph from './graph.js';
 import MtrMap from './mtr.js';
+import Globe from './globe.js';
 
 const canvas = document.getElementById('scene');
 Graph.init(canvas);
+Globe.init(document.getElementById('globe'), document.getElementById('globe-labels'));
 
 const TYPE_COLOR = { dns: '#4ad8ff', isp: '#ff8a3d', cloud: '#b78bff' };
 const laneColor = (p) => (p.anycast ? '#ffd23f' : (TYPE_COLOR[p.type] || '#4ad8ff'));
@@ -18,10 +20,69 @@ const state = {
   paused: false,
   tickMs: 1000,
   view: { mode: 'live', rangeMs: null, to: null },
+  viewMode: 'graph',   // 'graph' (3D smoke) | 'globe'
+  origin: null,
   filterType: 'all',
   search: '',
 };
 const selectedProbes = () => state.probes.filter((p) => state.selected.has(p.id));
+
+// ---------------------------------------------------------------------------
+// Globe view — arcs from this server to each selected destination
+// ---------------------------------------------------------------------------
+// One datum per selected probe: live RTT (label), loss (colour) and the smoothed
+// "smoke" spread (line width) from the recent live buffer.
+function globeData() {
+  return selectedProbes().map((p) => {
+    const buf = state.live.get(p.id) || [];
+    const last = buf.length ? buf[buf.length - 1] : state.latest.get(p.id);
+    const recent = buf.slice(-60).filter((s) => s.max != null && s.min != null);
+    const spread = recent.length ? recent.reduce((a, s) => a + (s.max - s.min), 0) / recent.length : 0;
+    return {
+      id: p.id, ip: p.ip, label: p.provider || p.label, lat: p.lat, lon: p.lon,
+      avg: last ? last.median : null, loss: last ? last.loss : 0, spread,
+    };
+  });
+}
+let _globeT = 0;
+function refreshGlobe(force) {
+  if (state.viewMode !== 'globe') return;
+  const now = Date.now();
+  if (!force && now - _globeT < 350) return;
+  _globeT = now;
+  Globe.setData(globeData());
+}
+
+function setView(mode) {
+  if (mode === state.viewMode) return;
+  state.viewMode = mode;
+  document.querySelectorAll('.vbtn').forEach((b) => b.classList.toggle('on', b.dataset.view === mode));
+  document.body.classList.toggle('globe-view', mode === 'globe');
+  document.getElementById('globe-hud').style.display = mode === 'globe' ? '' : 'none';
+  if (mode === 'globe') {
+    Graph.pause();
+    canvas.style.display = 'none';
+    Globe.show();
+    refreshGlobe(true);
+  } else {
+    Globe.hide();
+    canvas.style.display = '';
+    Graph.resume();
+  }
+}
+document.querySelectorAll('.vbtn').forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+
+// click an arc/label → keep the probe in the smoke graph, then open its MTR
+Globe.onSelect = (p) => {
+  if (!state.selected.has(p.id)) {
+    const cb = selList.querySelector(`.sel-row[data-id="${p.id}"] .sel-cb`);
+    if (cb) cb.checked = true;
+    toggleSelect(p.id, true);
+  }
+  mtrIp.value = p.ip;
+  setDrawer(false);
+  openMtr(p.ip);
+};
 
 // ---------------------------------------------------------------------------
 // Probe selector
@@ -110,6 +171,7 @@ function applySelection() {
   } else {
     enterHistory(state.view.rangeMs, state.view.to);
   }
+  refreshGlobe(true);
 }
 
 async function seedHistory(id) {
@@ -212,6 +274,9 @@ function connect() {
       }
       state.agents = msg.agents || [];
       renderVantages();
+      state.origin = msg.origin || null;
+      Globe.setOrigin(msg.origin);
+      refreshGlobe(true);
       if (!state.shareApplied) { state.shareApplied = true; applyShareParams(); }
     } else if (msg.type === 'agents') {
       state.agents = msg.agents || [];
@@ -227,6 +292,7 @@ function connect() {
           if (state.view.mode === 'live' && !state.paused) Graph.pushSample(s);
         }
       }
+      refreshGlobe();
     } else if (msg.type === 'mtr') {
       handleMtr(msg);
     }

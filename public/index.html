@@ -19,6 +19,13 @@
 </head>
 <body>
   <canvas id="scene"></canvas>
+  <canvas id="globe" class="globe-canvas" style="display:none"></canvas>
+  <div id="globe-labels" class="globe-labels" style="display:none"></div>
+  <div id="globe-hud" class="globe-hud" style="display:none">
+    <div class="gh-row"><span class="gh-grad"></span> loss&nbsp;0→100%</div>
+    <div class="gh-row"><span class="gh-w"></span> line width = latency variance</div>
+    <div class="gh-row gh-tip">◉ this server · click a line for its MTR</div>
+  </div>
 
   <header id="topbar">
     <button id="menu-toggle" class="menu-toggle" aria-label="toggle probes">☰</button>
@@ -28,6 +35,10 @@
         <h1>PINGSCOPE</h1>
         <p class="sub">live latency observatory · smokeping reimagined</p>
       </div>
+    </div>
+    <div class="viewswitch">
+      <button class="vbtn on" data-view="graph" title="3D smoke graph">◵ graph</button>
+      <button class="vbtn" data-view="globe" title="globe — server → destinations">🌐 globe</button>
     </div>
     <div class="status">
       <span id="conn-dot" class="dot"></span>

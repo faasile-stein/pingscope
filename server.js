@@ -23,6 +23,7 @@ const PROBES_CONF = process.env.PROBES_CONF || path.join(__dirname, 'probes.conf
 let PROBES = [];          // built in main() after geo DBs load
 let PROBE_BY_IP = new Map();
 let PRESELECTED = [];
+let ORIGIN = null;        // this server's location (globe view origin)
 
 const TICK_MS = Number(process.env.TICK_MS || 1000);  // one measurement per second
 const PINGS_PER_TICK = Number(process.env.PINGS_PER_TICK || 5);  // pings/host/tick
@@ -61,6 +62,7 @@ async function buildCatalog() {
     if (!ip || seen.has(ip)) continue;
     seen.add(ip);
     const g = s.anycast ? null : geoLookup(ip);
+    const coords = geoLookup(ip); // always resolve lat/lon (incl. anycast) for the globe
     out.push({
       id: `${s.type}-${ip.replace(/\./g, '-')}`,
       type: s.type, ip, host: s.host !== ip ? s.host : undefined,
@@ -68,12 +70,26 @@ async function buildCatalog() {
       country: s.anycast ? 'Anycast' : ((g && g.country) || 'Unknown'),
       cc: s.anycast ? '' : ((g && g.cc) || ''),
       city: s.anycast ? '' : ((g && g.city) || ''),
+      lat: coords.lat ?? null, lon: coords.lon ?? null,
       as: (g && g.asn) ? `AS${g.asn}` : '', asName: (g && g.org) || '',
       ptr: s._ptr || null,
       default: !!s.default,
     });
   }
   return out;
+}
+
+// This server's own location (origin of every arc on the globe). Configure via
+// env (SERVER_LAT/SERVER_LON/SERVER_CITY, or SERVER_IP to geolocate it);
+// defaults to the fr1 region — OVH Gravelines, where the deployment egresses.
+function computeOrigin() {
+  const lat = process.env.SERVER_LAT, lon = process.env.SERVER_LON;
+  if (lat && lon) return { lat: +lat, lon: +lon, city: process.env.SERVER_CITY || 'server', country: process.env.SERVER_COUNTRY || '', cc: process.env.SERVER_CC || '' };
+  if (process.env.SERVER_IP) {
+    const g = geoLookup(process.env.SERVER_IP);
+    if (g && g.lat != null) return { lat: g.lat, lon: g.lon, city: g.city || 'server', country: g.country || '', cc: g.cc || '' };
+  }
+  return { lat: 50.9871, lon: 1.5897, city: process.env.SERVER_CITY || 'fr1', country: 'France', cc: 'FR' };
 }
 
 // Default visualised set: probes flagged `default`; else top 5 per type×country.
@@ -419,6 +435,7 @@ wss.on('connection', (ws) => {
     tickMs: TICK_MS,
     history: preHistory,
     agents: publicAgents(),
+    origin: ORIGIN,
   }));
 
   const session = { mtr: null, reqs: new Set(), lastMtr: 0 };
@@ -719,6 +736,7 @@ async function main() {
   PROBES = await buildCatalog();
   PROBE_BY_IP = new Map(PROBES.map((p) => [p.ip, p]));
   PRESELECTED = computePreselected();
+  ORIGIN = computeOrigin();
   seedHistory();
   loop();
   server.listen(PORT, () => {

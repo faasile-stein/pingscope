@@ -13,6 +13,9 @@ SmokePing-style historic browsing (1h / 6h / 24h / 7d / 30d).
 
 - **3D smoke graph** — every probe is a flowing lane of nested latency-percentile
   bands under a glowing median ribbon; orbit/zoom/hover for detail.
+- **3D globe** — an arc from the server to each selected destination; colour grades
+  green→red with loss, line width grows with latency variance, each shows live RTT,
+  and clicking a line opens its MTR.
 - **Live MTR** — full-screen latency map; hops spaced by RTT, with reverse-DNS
   name, AS network and country/flag per hop (fully offline GeoIP — no API calls).
 - **Distributed MTR** — combine the server's trace with traces from **community

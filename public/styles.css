@@ -445,3 +445,65 @@ body.mtr-open #timemachine { opacity: 0; pointer-events: none; transition: opaci
   .stage-meta { display: none; }
   .readout, .mtr-tip { font-size: 10.5px; }
 }
+
+/* ============================ Globe view ============================ */
+.globe-canvas {
+  position: fixed; inset: 0; width: 100vw; height: 100vh;
+  display: block; z-index: 2; touch-action: none;
+}
+.globe-labels {
+  position: fixed; inset: 0; z-index: 3; pointer-events: none; overflow: hidden;
+}
+.globe-label {
+  position: absolute; top: 0; left: 0; pointer-events: auto; cursor: pointer;
+  display: flex; align-items: center; gap: 5px; white-space: nowrap;
+  padding: 3px 8px; border-radius: 999px;
+  background: rgba(8, 12, 24, 0.74); border: 1px solid color-mix(in srgb, var(--c) 70%, transparent);
+  box-shadow: 0 0 12px color-mix(in srgb, var(--c) 35%, transparent);
+  font: 600 11px/1 ui-monospace, Menlo, monospace; color: #eaf0ff;
+  backdrop-filter: blur(3px); transition: transform .05s linear, box-shadow .2s ease;
+}
+.globe-label b { color: var(--c); font-weight: 700; }
+.globe-label i { color: #ff6b8b; font-style: normal; font-size: 10px; }
+.globe-label .gl-name { color: var(--muted); font-weight: 500; font-size: 10px; max-width: 130px; overflow: hidden; text-overflow: ellipsis; }
+.globe-label.hot { box-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent); z-index: 5; }
+.globe-label.hot .gl-name { color: #cdd7f5; }
+
+/* view switcher in the top bar */
+.viewswitch { pointer-events: auto; display: flex; gap: 4px; padding: 4px;
+  background: rgba(12, 16, 30, 0.6); border: 1px solid rgba(120, 140, 200, 0.18);
+  border-radius: 999px; backdrop-filter: blur(6px); }
+.vbtn {
+  border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font: 600 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .4px;
+  padding: 7px 13px; border-radius: 999px; transition: background .2s, color .2s;
+}
+.vbtn:hover { color: #dfe7ff; }
+.vbtn.on { background: rgba(74, 216, 255, 0.16); color: var(--accent); box-shadow: inset 0 0 0 1px rgba(74,216,255,.35); }
+
+/* globe legend */
+.globe-hud {
+  position: fixed; left: 22px; bottom: 22px; z-index: 4;
+  padding: 12px 14px; border-radius: 14px;
+  background: rgba(10, 14, 26, 0.66); border: 1px solid rgba(120, 140, 200, 0.16);
+  backdrop-filter: blur(8px); font: 500 11.5px/1.5 ui-monospace, Menlo, monospace; color: var(--muted);
+}
+.globe-hud .gh-row { display: flex; align-items: center; gap: 8px; }
+.globe-hud .gh-row + .gh-row { margin-top: 6px; }
+.globe-hud .gh-grad { width: 46px; height: 7px; border-radius: 4px;
+  background: linear-gradient(90deg, #36f1a3, #ffd23f, #ff3b6b); }
+.globe-hud .gh-w { width: 46px; height: 0; border-top: 3px solid #6f86c0;
+  border-image: linear-gradient(90deg, rgba(111,134,192,.4) 0 2px, #aebbe0) 1; }
+.globe-hud .gh-tip { color: #aeb9da; margin-top: 8px; }
+
+/* in globe view, hide the graph-only controls */
+body.globe-view #hud,
+body.globe-view #timemachine { opacity: 0; pointer-events: none; }
+body.mtr-open .globe-canvas, body.mtr-open .globe-labels, body.mtr-open .globe-hud { opacity: 0; pointer-events: none; transition: opacity .3s ease; }
+
+@media (max-width: 720px) {
+  .viewswitch { padding: 3px; }
+  .vbtn { padding: 6px 9px; font-size: 11px; }
+  .globe-hud { left: 12px; bottom: 84px; font-size: 10.5px; padding: 9px 11px; }
+  .globe-label .gl-name { display: none; }
+}

@@ -407,6 +407,7 @@ class Graph {
   }
 
   _loop() {
+    if (this._paused) { this._raf = null; return; }
     const now = Date.now();
     const { end, spanSec } = this._window();
     const dxPerSec = SPAN / spanSec;
@@ -446,6 +447,10 @@ class Graph {
     this.composer.render();
     this._raf = requestAnimationFrame(() => this._loop());
   }
+
+  // pause/resume the render loop (e.g. while the globe view is showing)
+  pause() { this._paused = true; if (this._raf) cancelAnimationFrame(this._raf); this._raf = null; }
+  resume() { if (!this._paused) return; this._paused = false; if (!this._raf) this._loop(); }
 }
 
 function setAttr(geo, name, arr, item) {

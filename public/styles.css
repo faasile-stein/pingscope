@@ -470,9 +470,9 @@ body.mtr-open #timemachine { opacity: 0; pointer-events: none; transition: opaci
 .globe-label.hot .gl-name { color: #cdd7f5; }
 
 /* view switcher in the top bar */
-.viewswitch { pointer-events: auto; display: flex; gap: 4px; padding: 4px;
-  background: rgba(12, 16, 30, 0.6); border: 1px solid rgba(120, 140, 200, 0.18);
-  border-radius: 999px; backdrop-filter: blur(6px); }
+.viewswitch { pointer-events: auto; flex: 0 0 auto; display: flex; gap: 4px; padding: 4px;
+  background: rgba(16, 22, 40, 0.72); border: 1px solid rgba(120, 140, 200, 0.32);
+  border-radius: 999px; backdrop-filter: blur(6px); box-shadow: 0 4px 18px rgba(0,0,0,0.35); }
 .vbtn {
   border: 0; background: transparent; color: var(--muted); cursor: pointer;
   font: 600 12px/1 ui-monospace, Menlo, monospace; letter-spacing: .4px;

@@ -261,6 +261,8 @@ app.get('/', (req, res) => {
       image: `${base}/og`, url: base,
     });
   }
+  // never cache the shell, so new builds (and their JS/CSS) show up on reload
+  res.set('Cache-Control', 'no-store');
   res.type('html').send(INDEX_HTML.replace('<!--OG-->', tags));
 });
 

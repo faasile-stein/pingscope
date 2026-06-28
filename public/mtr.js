@@ -209,6 +209,14 @@ class MtrMap {
       const track = this.tracks.get(source);
       track._geo = (track.hops || []).filter((h) => h.geo && h.geo.lat != null && h.geo.lon != null);
       for (const h of track._geo) all.push({ lon: h.geo.lon, lat: h.geo.lat });
+      // effective ASN: a hop with no ASN is folded into the NEXT AS in the path
+      // (so it never shows as its own "ASnull"); falls back to the previous AS.
+      const g = track._geo, eff = new Array(g.length);
+      let nextA = null;
+      for (let i = g.length - 1; i >= 0; i--) { if (g[i].geo && g[i].geo.asn) nextA = g[i].geo.asn; eff[i] = (g[i].geo && g[i].geo.asn) || nextA; }
+      let prevA = null;
+      for (let i = 0; i < g.length; i++) { if (eff[i]) prevA = eff[i]; else eff[i] = prevA; }
+      track._effAsn = eff;
     }
     if (!all.length) {
       ctx.save(); ctx.fillStyle = 'rgba(126,136,171,0.8)'; ctx.font = '13px ui-monospace, Menlo, monospace';
@@ -265,9 +273,14 @@ class MtrMap {
       return this._asColor.get(asn);
     };
     const asOrder = [], asOrg = new Map();
-    for (const source of this.order) for (const h of (this.tracks.get(source)._geo || [])) {
-      const asn = h.geo.asn; if (!asn) continue;
-      if (!asOrg.has(asn)) { asOrg.set(asn, h.geo.org || `AS${asn}`); asOrder.push(asn); asColorOf(asn); }
+    for (const source of this.order) {
+      const track = this.tracks.get(source), g = track._geo || [];
+      g.forEach((h, i) => {
+        if (h.geo.asn && !asOrg.has(h.geo.asn)) asOrg.set(h.geo.asn, h.geo.org || `AS${h.geo.asn}`); // org from the real hop
+        const asn = track._effAsn[i]; if (!asn) return;
+        if (!asOrder.includes(asn)) asOrder.push(asn);
+        asColorOf(asn);
+      });
     }
 
     // routes — each leg coloured by the AS it enters
@@ -275,7 +288,7 @@ class MtrMap {
       const track = this.tracks.get(source), g = track._geo;
       for (let i = 1; i < g.length; i++) {
         const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
-        const col = asColorOf(g[i - 1].geo.asn); // colour by the AS carrying this leg (source)
+        const col = asColorOf(track._effAsn[i - 1]); // colour by the AS carrying this leg (source)
         ctx.save();
         ctx.strokeStyle = rgb(col, 0.9); ctx.lineWidth = 2.4; ctx.lineJoin = 'round';
         ctx.shadowColor = rgb(col, 0.5); ctx.shadowBlur = 7;
@@ -286,7 +299,7 @@ class MtrMap {
     // dots: loss-coloured fill + AS-coloured ring; hover-pick when not panning
     for (const source of this.order) {
       const track = this.tracks.get(source);
-      for (const h of (track._geo || [])) {
+      (track._geo || []).forEach((h, idx) => {
         const p = project(h.geo.lon, h.geo.lat);
         const hovered = this.hover && this.hover.idx === h.idx && this.hover.source === source;
         if (this._ptr.inside && !this._pointers.size) {
@@ -296,14 +309,14 @@ class MtrMap {
             if (this.onHover) this.onHover({ hop: h, track: { label: track.label }, cx: this._ptr.cx, cy: this._ptr.cy });
           }
         }
-        const col = lossColor(h.loss || 0), as = asColorOf(h.geo.asn), r = hovered ? 6 : 4.5;
+        const col = lossColor(h.loss || 0), as = asColorOf(track._effAsn[idx]), r = hovered ? 6 : 4.5;
         ctx.save();
         ctx.strokeStyle = rgb(as, 0.95); ctx.lineWidth = 2;
         ctx.beginPath(); ctx.arc(p.x, p.y, r + 2.5, 0, Math.PI * 2); ctx.stroke();
         ctx.shadowColor = rgb(col, 0.9); ctx.shadowBlur = hovered ? 18 : 11;
         ctx.fillStyle = rgb(col, 1); ctx.beginPath(); ctx.arc(p.x, p.y, r, 0, Math.PI * 2); ctx.fill();
         ctx.restore();
-      }
+      });
     }
     // labels: per-segment latency at each leg's midpoint + city names at hops
     const placed = [];
@@ -325,15 +338,17 @@ class MtrMap {
       // carrying the packet across its own footprint (incl. long-haul to the
       // handoff) instead of dumping that onto the next AS. First AS labelled; legs
       // sum to the end-to-end RTT. (Per-hop detail is on hover.)
+      const eff = track._effAsn;
+      const orgOf = (asn) => (asOrg.get(asn) || (asn ? `AS${asn}` : 'unknown')).slice(0, 18);
       let prevEgressCum = 0, runStart = 0;
       for (let i = 1; i <= g.length; i++) {
-        if (i < g.length && g[i].geo.asn === g[runStart].geo.asn) continue;
-        const asn = g[runStart].geo.asn;
+        if (i < g.length && eff[i] === eff[runStart]) continue;
+        const asn = eff[runStart];
         const egCum = cumByIdx.get(g[i - 1].idx) ?? prevEgressCum;
         const d = Math.max(0, egCum - prevEgressCum);
         const ms = d < 0.05 ? '≈0ms' : `${d.toFixed(d < 10 ? 1 : 0)}ms`;
-        const cur = (g[runStart].geo.org || `AS${asn}`).slice(0, 18);
-        const next = i < g.length ? (g[i].geo.org || `AS${g[i].geo.asn}`).slice(0, 18) : 'end';
+        const cur = orgOf(asn);
+        const next = i < g.length ? orgOf(eff[i]) : 'end';
         // place at the AS boundary (or the destination for the last AS)
         let pos;
         if (i < g.length) { const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat); pos = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }; }

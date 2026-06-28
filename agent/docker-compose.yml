@@ -10,8 +10,9 @@ services:
     read_only: true
     security_opt: ["no-new-privileges:true"]
     environment:
-      # ask the maintainer for the community token, then put it here (or in a .env file)
-      AGENT_TOKEN: "${AGENT_TOKEN:?set AGENT_TOKEN}"
+      # public community join token for pingscope.net (preconfigured; override
+      # only if you point PINGSCOPE_URL at your own server)
+      AGENT_TOKEN: "${AGENT_TOKEN:-UktngTqbL-YVYL2mpKEhEdfPvWhpopNd}"
       # optional public label shown next to your country + AS (no personal info, please)
       AGENT_NAME: "${AGENT_NAME:-}"
       # override only if you run your own PingScope server

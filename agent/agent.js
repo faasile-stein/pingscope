@@ -9,7 +9,10 @@ const { spawn } = require('child_process');
 const WebSocket = require('ws');
 
 const SERVER = process.env.PINGSCOPE_URL || 'wss://pingscope.net/agent';
-const TOKEN = process.env.AGENT_TOKEN || '';
+// Public community join token for pingscope.net. The agent is sandboxed (only
+// runs `mtr` to validated public IPs), so this gate is intentionally open — set
+// AGENT_TOKEN to override when pointing at your own server.
+const TOKEN = process.env.AGENT_TOKEN || 'UktngTqbL-YVYL2mpKEhEdfPvWhpopNd';
 const NAME = (process.env.AGENT_NAME || '').replace(/[^\w .\-]/g, '').slice(0, 32);
 const MAX_CONCURRENT = Number(process.env.AGENT_MAX_CONCURRENT || 2);
 const MAX_PER_MIN = Number(process.env.AGENT_MAX_PER_MIN || 20);

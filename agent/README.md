@@ -15,12 +15,11 @@ combined paths from every selected vantage are drawn together.
 
 ## Run it
 
-You need the community **token** from the maintainer.
+The public community token for **pingscope.net** is already baked in — just give
+your vantage a label and start it:
 
 ```sh
-AGENT_TOKEN=the-community-token \
-AGENT_NAME="Brussels home" \
-docker compose up -d --build
+AGENT_NAME="Brussels home" docker compose up -d --build
 ```
 
 Or plain Docker:
@@ -29,10 +28,14 @@ Or plain Docker:
 docker build -t pingscope-agent .
 docker run -d --restart unless-stopped \
   --cap-drop ALL --cap-add NET_RAW --security-opt no-new-privileges:true \
-  -e AGENT_TOKEN=the-community-token \
   -e AGENT_NAME="Brussels home" \
   pingscope-agent
 ```
+
+> The token (`UktngTqbL-YVYL2mpKEhEdfPvWhpopNd`) is public on purpose: the agent
+> is sandboxed and only ever runs `mtr` to validated public IPs, so the gate is
+> just light abuse protection. Override `AGENT_TOKEN` / `PINGSCOPE_URL` only when
+> running against your own PingScope server.
 
 Check it registered:
 
@@ -46,7 +49,7 @@ docker logs -f pingscope-agent
 
 | Env var               | Default                                            | Meaning                          |
 | --------------------- | -------------------------------------------------- | -------------------------------- |
-| `AGENT_TOKEN`         | *(required)*                                       | community token from maintainer  |
+| `AGENT_TOKEN`         | *(public token, preconfigured)*                    | join token (override for your own server) |
 | `AGENT_NAME`          | *(empty)*                                          | optional public label            |
 | `PINGSCOPE_URL`       | `wss://pingscope.net/agent`| server endpoint                  |
 | `AGENT_MAX_CONCURRENT`| `2`                                                | max simultaneous traceroutes     |

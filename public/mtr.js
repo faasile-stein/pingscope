@@ -320,23 +320,23 @@ class MtrMap {
         if (v != null) cum = cum == null ? v : Math.max(cum, v);
         cumByIdx.set(h.idx, cum);
       }
-      for (let i = 1; i < g.length; i++) {
-        const A = g[i - 1], B = g[i];
-        const ca = cumByIdx.get(A.idx), cb = cumByIdx.get(B.idx);
-        if (ca == null || cb == null) continue;
-        const d = cb - ca;
+      // Per-AS latency: the cumulative RTT at each AS's ingress minus the previous
+      // AS's ingress. Includes the prior network's traversal + the handoff, so it's
+      // never zero/negative even when a hop's raw RTT dips; the legs sum to the
+      // end-to-end RTT. The first AS gets a label too. (Per-hop detail is on hover.)
+      let prevCum = 0, prevAsn = null;
+      for (let i = 0; i < g.length; i++) {
+        const h = g[i], asn = h.geo.asn;
+        if (!asn || asn === prevAsn) continue;
+        const cAt = cumByIdx.get(h.idx) ?? prevCum;
+        const d = Math.max(0, cAt - prevCum);
         const ms = d < 0.05 ? '≈0' : `+${d.toFixed(d < 10 ? 1 : 0)}`;
-        const pa = project(A.geo.lon, A.geo.lat), pb = project(B.geo.lon, B.geo.lat);
-        const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
-        // AS boundary: per-city geo within one AS is unreliable, so the meaningful
-        // number is the latency between ASes. Highlight those legs with the AS entered.
-        const boundary = A.geo.asn && B.geo.asn && A.geo.asn !== B.geo.asn;
-        if (boundary) {
-          const org = (B.geo.org || `AS${B.geo.asn}`).slice(0, 20);
-          this._geoSegLabel(ctx, mid, `→ ${org} ${ms}ms`, [255, 210, 63], placed, true);
-        } else {
-          this._geoSegLabel(ctx, mid, `${ms}ms`, asColorOf(B.geo.asn), placed, false);
-        }
+        const org = (h.geo.org || `AS${asn}`).slice(0, 20);
+        let pos;
+        if (i > 0) { const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(h.geo.lon, h.geo.lat); pos = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }; }
+        else { pos = project(h.geo.lon, h.geo.lat); }
+        this._geoSegLabel(ctx, pos, `→ ${org} ${ms}ms`, asColorOf(asn), placed, true);
+        prevCum = cAt; prevAsn = asn;
       }
       for (const h of g) {
         const city = h.geo.city || h.geo.country || '';

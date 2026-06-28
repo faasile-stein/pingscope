@@ -269,7 +269,7 @@ app.get('/og', (req, res) => {
   <text x="80" y="300" font-family="monospace" font-size="${target && target.length > 22 ? 64 : 86}" font-weight="bold" fill="#e7ecff">${xmlEsc(headline)}</text>
   <text x="80" y="360" font-family="monospace" font-size="30" fill="#7e88ab">${xmlEsc(sub)}</text>
   <path d="${path}" fill="none" stroke="#4ad8ff" stroke-width="3" stroke-opacity="0.6"/>${nodes}
-  <text x="80" y="570" font-family="monospace" font-size="26" fill="#7e88ab">pingscope.net</text>
+  <text x="80" y="570" font-family="monospace" font-size="26" fill="#7e88ab">pingscope.be</text>
 </svg>`;
   res.type('image/svg+xml').set('Cache-Control', 'public, max-age=3600').send(svg);
 });

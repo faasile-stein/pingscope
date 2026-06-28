@@ -48,7 +48,7 @@ docker logs -f pingscope-agent
 | --------------------- | -------------------------------------------------- | -------------------------------- |
 | `AGENT_TOKEN`         | *(required)*                                       | community token from maintainer  |
 | `AGENT_NAME`          | *(empty)*                                          | optional public label            |
-| `PINGSCOPE_URL`       | `wss://pingscope.net/agent`| server endpoint                  |
+| `PINGSCOPE_URL`       | `wss://pingscope.be/agent`| server endpoint                  |
 | `AGENT_MAX_CONCURRENT`| `2`                                                | max simultaneous traceroutes     |
 | `AGENT_MAX_PER_MIN`   | `20`                                               | max traceroutes per minute       |
 

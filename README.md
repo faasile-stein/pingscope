@@ -5,7 +5,7 @@ second, stores the history in a durable SQLite store, and renders the latency
 "smoke" in a custom **Three.js** 3D visualisation — plus a live **MTR** map and
 SmokePing-style historic browsing (1h / 6h / 24h / 7d / 30d).
 
-🌐 **Live:** <https://pingscope.net>
+🌐 **Live:** <https://pingscope.be>
 
 ![status](https://img.shields.io/badge/status-live-36f1a3) ![license](https://img.shields.io/badge/license-MIT-4ad8ff)
 

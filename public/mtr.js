@@ -275,7 +275,7 @@ class MtrMap {
       const track = this.tracks.get(source), g = track._geo;
       for (let i = 1; i < g.length; i++) {
         const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
-        const col = asColorOf(g[i].geo.asn);
+        const col = asColorOf(g[i - 1].geo.asn); // colour by the AS carrying this leg (source)
         ctx.save();
         ctx.strokeStyle = rgb(col, 0.9); ctx.lineWidth = 2.4; ctx.lineJoin = 'round';
         ctx.shadowColor = rgb(col, 0.5); ctx.shadowBlur = 7;
@@ -320,23 +320,21 @@ class MtrMap {
         if (v != null) cum = cum == null ? v : Math.max(cum, v);
         cumByIdx.set(h.idx, cum);
       }
-      // Per-AS latency: the cumulative RTT at each AS's ingress minus the previous
-      // AS's ingress. Includes the prior network's traversal + the handoff, so it's
-      // never zero/negative even when a hop's raw RTT dips; the legs sum to the
-      // end-to-end RTT. The first AS gets a label too. (Per-hop detail is on hover.)
-      let prevCum = 0, prevAsn = null;
-      for (let i = 0; i < g.length; i++) {
-        const h = g[i], asn = h.geo.asn;
-        if (!asn || asn === prevAsn) continue;
-        const cAt = cumByIdx.get(h.idx) ?? prevCum;
-        const d = Math.max(0, cAt - prevCum);
+      // Per-AS latency, attributed by EGRESS: each AS = cumulative RTT at its last
+      // hop minus the previous AS's last hop. So a network is credited with
+      // carrying the packet across its own footprint (incl. long-haul to the
+      // handoff) instead of dumping that onto the next AS. First AS labelled; legs
+      // sum to the end-to-end RTT. (Per-hop detail is on hover.)
+      let prevEgressCum = 0, runStart = 0;
+      for (let i = 1; i <= g.length; i++) {
+        if (i < g.length && g[i].geo.asn === g[runStart].geo.asn) continue;
+        const asn = g[runStart].geo.asn;
+        const egCum = cumByIdx.get(g[i - 1].idx) ?? prevEgressCum;
+        const d = Math.max(0, egCum - prevEgressCum);
         const ms = d < 0.05 ? '≈0' : `+${d.toFixed(d < 10 ? 1 : 0)}`;
-        const org = (h.geo.org || `AS${asn}`).slice(0, 20);
-        let pos;
-        if (i > 0) { const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(h.geo.lon, h.geo.lat); pos = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }; }
-        else { pos = project(h.geo.lon, h.geo.lat); }
-        this._geoSegLabel(ctx, pos, `→ ${org} ${ms}ms`, asColorOf(asn), placed, true);
-        prevCum = cAt; prevAsn = asn;
+        const org = (g[runStart].geo.org || `AS${asn}`).slice(0, 20);
+        this._geoSegLabel(ctx, project(g[runStart].geo.lon, g[runStart].geo.lat), `→ ${org} ${ms}ms`, asColorOf(asn), placed, true);
+        prevEgressCum = egCum; runStart = i;
       }
       for (const h of g) {
         const city = h.geo.city || h.geo.country || '';

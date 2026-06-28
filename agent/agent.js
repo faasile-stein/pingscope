@@ -8,7 +8,7 @@
 const { spawn } = require('child_process');
 const WebSocket = require('ws');
 
-const SERVER = process.env.PINGSCOPE_URL || 'wss://pingscope.be/agent';
+const SERVER = process.env.PINGSCOPE_URL || 'wss://pingscope.net/agent';
 const TOKEN = process.env.AGENT_TOKEN || '';
 const NAME = (process.env.AGENT_NAME || '').replace(/[^\w .\-]/g, '').slice(0, 32);
 const MAX_CONCURRENT = Number(process.env.AGENT_MAX_CONCURRENT || 2);

@@ -15,4 +15,4 @@ services:
       # optional public label shown next to your country + AS (no personal info, please)
       AGENT_NAME: "${AGENT_NAME:-}"
       # override only if you run your own PingScope server
-      PINGSCOPE_URL: "${PINGSCOPE_URL:-wss://pingscope.be/agent}"
+      PINGSCOPE_URL: "${PINGSCOPE_URL:-wss://pingscope.net/agent}"

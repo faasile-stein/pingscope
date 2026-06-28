@@ -131,8 +131,27 @@ class MtrMap {
     });
   }
 
+  // Lazily fetch + decode world country borders (Natural Earth 110m TopoJSON).
+  // Drawing every arc once yields the full set of country/coastline contours.
+  _ensureBorders() {
+    if (this._borders || this._bordersLoading) return;
+    this._bordersLoading = true;
+    fetch('https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json')
+      .then((r) => r.json())
+      .then((topo) => {
+        const t = topo.transform, sx = t.scale[0], sy = t.scale[1], tx = t.translate[0], ty = t.translate[1];
+        this._borders = topo.arcs.map((arc) => {
+          let x = 0, y = 0; const out = [];
+          for (const p of arc) { x += p[0]; y += p[1]; out.push([x * sx + tx, y * sy + ty]); }
+          return out;
+        });
+      })
+      .catch(() => { this._borders = []; }); // no basemap → graticule only
+  }
+
   // ---- geographic route view: hops plotted at their city lat/lon ----
   _drawGeo(ctx, time) {
+    this._ensureBorders();
     const GL = 24, GR = 24, GT = 56, GB = 26;
     const all = [];
     for (const source of this.order) {
@@ -159,6 +178,19 @@ class MtrMap {
     const project = (lon, lat) => ({ x: ox + (lon - lonMin) * cosLat * scale, y: oy + (latMax - lat) * scale });
 
     this._drawGraticule(ctx, lonMin, lonMax, latMin, latMax, project);
+
+    // white country contours (basemap), clipped to the map area
+    if (this._borders && this._borders.length) {
+      ctx.save();
+      ctx.beginPath(); ctx.rect(GL, GT, this.W - GL - GR, this.H - GT - GB); ctx.clip();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 1;
+      ctx.beginPath();
+      for (const arc of this._borders) {
+        for (let i = 0; i < arc.length; i++) { const p = project(arc[i][0], arc[i][1]); i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y); }
+      }
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // routes
     for (const source of this.order) {

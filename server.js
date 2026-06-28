@@ -205,6 +205,75 @@ function seedHistory() {
 }
 
 const app = express();
+app.set('trust proxy', true); // behind bootload's proxy → correct req.protocol/host
+
+// ---- shareable MTR views: inject Open Graph tags + a dynamic preview image ----
+const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+const xmlEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cleanTarget = (s) => String(s || '').replace(/[^a-zA-Z0-9.:-]/g, '').slice(0, 64);
+
+function ogTags({ title, desc, image, url }) {
+  return [
+    `<meta property="og:type" content="website">`,
+    `<meta property="og:site_name" content="PingScope">`,
+    `<meta property="og:title" content="${xmlEsc(title)}">`,
+    `<meta property="og:description" content="${xmlEsc(desc)}">`,
+    `<meta property="og:url" content="${xmlEsc(url)}">`,
+    `<meta property="og:image" content="${xmlEsc(image)}">`,
+    `<meta name="twitter:card" content="summary_large_image">`,
+    `<meta name="twitter:title" content="${xmlEsc(title)}">`,
+    `<meta name="twitter:description" content="${xmlEsc(desc)}">`,
+    `<meta name="twitter:image" content="${xmlEsc(image)}">`,
+  ].join('\n  ');
+}
+
+app.get('/', (req, res) => {
+  const base = `${req.protocol}://${req.get('host')}`;
+  const target = cleanTarget(req.query.mtr);
+  let tags;
+  if (target) {
+    const vps = String(req.query.vp || '').split(',').filter(Boolean).length;
+    const vantages = 1 + vps; // this server + community vantages
+    const title = `MTR ⟶ ${target} · PingScope`;
+    const desc = `Live multi-point traceroute to ${target} from ${vantages} vantage point${vantages !== 1 ? 's' : ''} — latency, loss and geographic route.`;
+    const image = `${base}/og?mtr=${encodeURIComponent(target)}&n=${vantages}`;
+    tags = ogTags({ title, desc, image, url: `${base}/?mtr=${encodeURIComponent(target)}` });
+  } else {
+    tags = ogTags({
+      title: 'PingScope — live latency observatory',
+      desc: 'A modern SmokePing: 3D latency smoke graph, live distributed MTR with community vantage points, offline GeoIP/AS.',
+      image: `${base}/og`, url: base,
+    });
+  }
+  res.type('html').send(INDEX_HTML.replace('<!--OG-->', tags));
+});
+
+// Dynamic Open Graph preview image (SVG, 1200×630).
+app.get('/og', (req, res) => {
+  const target = cleanTarget(req.query.mtr);
+  const n = Math.max(1, Math.min(99, Number(req.query.n) || 1));
+  const headline = target ? `MTR ⟶ ${target}` : 'live latency observatory';
+  const sub = target ? `${n} vantage point${n !== 1 ? 's' : ''} · latency · loss · geographic route` : 'distributed traceroute · 3D smoke graph';
+  const nodes = Array.from({ length: 7 }, (_, i) => {
+    const x = 150 + i * 145, y = 430 + Math.sin(i * 0.9) * 28;
+    const c = i === 6 ? '#ff8a3d' : (i < 2 ? '#7e88ab' : '#4ad8ff');
+    return `<circle cx="${x}" cy="${y.toFixed(0)}" r="9" fill="${c}"/>`;
+  }).join('');
+  const path = Array.from({ length: 7 }, (_, i) => `${i ? 'L' : 'M'}${150 + i * 145},${(430 + Math.sin(i * 0.9) * 28).toFixed(0)}`).join(' ');
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+    <stop offset="0" stop-color="#0a0e1c"/><stop offset="1" stop-color="#05060c"/></linearGradient>
+    <radialGradient id="glow" cx="0.3" cy="0.2" r="0.8"><stop offset="0" stop-color="#4ad8ff" stop-opacity="0.18"/><stop offset="1" stop-color="#4ad8ff" stop-opacity="0"/></radialGradient></defs>
+  <rect width="1200" height="630" fill="url(#g)"/><rect width="1200" height="630" fill="url(#glow)"/>
+  <text x="80" y="120" font-family="monospace" font-size="34" fill="#4ad8ff" letter-spacing="10">◵ PINGSCOPE</text>
+  <text x="80" y="300" font-family="monospace" font-size="${target && target.length > 22 ? 64 : 86}" font-weight="bold" fill="#e7ecff">${xmlEsc(headline)}</text>
+  <text x="80" y="360" font-family="monospace" font-size="30" fill="#7e88ab">${xmlEsc(sub)}</text>
+  <path d="${path}" fill="none" stroke="#4ad8ff" stroke-width="3" stroke-opacity="0.6"/>${nodes}
+  <text x="80" y="570" font-family="monospace" font-size="26" fill="#7e88ab">pingscope.net</text>
+</svg>`;
+  res.type('image/svg+xml').set('Cache-Control', 'public, max-age=3600').send(svg);
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 // Full probe catalog + the default-visualised set.
 app.get('/api/probes', (_req, res) => res.json({ probes: PROBES, preselected: PRESELECTED }));
@@ -294,7 +363,10 @@ function safeEqual(a, b) {
 }
 // public view of an agent — country + AS only, NEVER the home IP
 function publicAgent(a) {
-  return { id: a.id, name: a.name || '', country: a.country || '', cc: a.cc || '', asName: a.asName || '' };
+  return {
+    id: a.id, name: a.name || '', country: a.country || '', cc: a.cc || '', asName: a.asName || '',
+    key: `${a.cc || 'xx'}:${a.asn || a.asName || ''}`.toLowerCase(), // stable across reconnects
+  };
 }
 function publicAgents() { return [...agents.values()].map(publicAgent); }
 function broadcastAgents() { broadcast({ type: 'agents', agents: publicAgents() }); }

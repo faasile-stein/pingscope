@@ -212,6 +212,7 @@ function connect() {
       }
       state.agents = msg.agents || [];
       renderVantages();
+      if (!state.shareApplied) { state.shareApplied = true; applyShareParams(); }
     } else if (msg.type === 'agents') {
       state.agents = msg.agents || [];
       renderVantages();
@@ -342,8 +343,10 @@ function trackMeta(source, agent) {
 }
 
 const vantagesEl = document.getElementById('mtr-vantages');
+let currentMtrTarget = '';
 function renderVantages() {
   const agents = state.agents || [];
+  state.agentById = new Map(agents.map((a) => [a.id, a]));
   for (const id of [...state.vantages]) if (!agents.some((a) => a.id === id)) state.vantages.delete(id);
   let html = `<span class="vh">vantages — ◉ this server + ${agents.length} community online</span>`;
   html += `<span class="vchip fixed" title="the PingScope server">◉ this server</span>`;
@@ -387,6 +390,7 @@ MtrMap.onHover = (info) => {
 
 function openMtr(ip) {
   if (!ip || ws.readyState !== 1) return;
+  currentMtrTarget = ip;
   stageTarget.textContent = ip;
   stageMeta.textContent = 'starting…';
   mtrStage.classList.remove('hidden');
@@ -414,6 +418,30 @@ document.querySelectorAll('.sv').forEach((b) => b.onclick = () => {
   b.classList.add('on');
   MtrMap.setMode(b.dataset.mode);
 });
+
+// ---- shareable MTR views ----
+const shareBtn = document.getElementById('stage-share');
+shareBtn.onclick = async () => {
+  if (!currentMtrTarget) return;
+  const keys = [...new Set([...state.vantages].map((id) => (state.agentById.get(id) || {}).key).filter(Boolean))];
+  const url = `${location.origin}/?mtr=${encodeURIComponent(currentMtrTarget)}` + (keys.length ? `&vp=${encodeURIComponent(keys.join(','))}` : '');
+  try { await navigator.clipboard.writeText(url); } catch { /* clipboard blocked */ }
+  shareBtn.textContent = '✓ link copied'; shareBtn.classList.add('copied');
+  setTimeout(() => { shareBtn.textContent = '⤴ share'; shareBtn.classList.remove('copied'); }, 1600);
+};
+
+// open a shared MTR from the URL: ?mtr=<target>&vp=<vantage keys>
+function applyShareParams() {
+  const p = new URLSearchParams(location.search);
+  const t = p.get('mtr');
+  if (!t) return;
+  const keys = (p.get('vp') || '').split(',').filter(Boolean);
+  state.vantages = new Set();
+  for (const a of (state.agents || [])) if (keys.includes(a.key)) state.vantages.add(a.id);
+  renderVantages();
+  mtrIp.value = t;
+  openMtr(t);
+}
 
 function updateStageMeta() {
   const n = MtrMap.order.length;

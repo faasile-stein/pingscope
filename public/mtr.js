@@ -301,12 +301,22 @@ class MtrMap {
         cumByIdx.set(h.idx, cum);
       }
       for (let i = 1; i < g.length; i++) {
-        const ca = cumByIdx.get(g[i - 1].idx), cb = cumByIdx.get(g[i].idx);
+        const A = g[i - 1], B = g[i];
+        const ca = cumByIdx.get(A.idx), cb = cumByIdx.get(B.idx);
         if (ca == null || cb == null) continue;
         const d = cb - ca;
-        const txt = d < 0.05 ? '≈0ms' : `+${d.toFixed(d < 10 ? 1 : 0)}ms`;
-        const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
-        this._geoSegLabel(ctx, { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 }, txt, track.color, placed);
+        const ms = d < 0.05 ? '≈0' : `+${d.toFixed(d < 10 ? 1 : 0)}`;
+        const pa = project(A.geo.lon, A.geo.lat), pb = project(B.geo.lon, B.geo.lat);
+        const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+        // AS boundary: per-city geo within one AS is unreliable, so the meaningful
+        // number is the latency between ASes. Highlight those legs with the AS entered.
+        const boundary = A.geo.asn && B.geo.asn && A.geo.asn !== B.geo.asn;
+        if (boundary) {
+          const org = (B.geo.org || `AS${B.geo.asn}`).slice(0, 20);
+          this._geoSegLabel(ctx, mid, `→ ${org} ${ms}ms`, [255, 210, 63], placed, true);
+        } else {
+          this._geoSegLabel(ctx, mid, `${ms}ms`, track.color, placed, false);
+        }
       }
       for (const h of g) {
         const city = h.geo.city || h.geo.country || '';
@@ -317,17 +327,19 @@ class MtrMap {
     this._geoHint(ctx);
   }
 
-  _geoSegLabel(ctx, mid, text, color, placed) {
-    ctx.font = 'bold 10px ui-monospace, Menlo, monospace';
-    const w = ctx.measureText(text).width + 8, H = 14;
+  _geoSegLabel(ctx, mid, text, color, placed, prominent = false) {
+    ctx.font = `${prominent ? 'bold 11' : '10'}px ui-monospace, Menlo, monospace`;
+    const pad = prominent ? 6 : 4, H = prominent ? 17 : 14;
+    const w = ctx.measureText(text).width + pad * 2;
     let by = mid.y - H / 2;
     let cand = { x: Math.max(2, Math.min(this.W - w - 2, mid.x - w / 2)), y: by, w, h: H }, guard = 0, dir = -1;
-    while (placed.some((b) => boxOverlap(b, cand, 3)) && guard++ < 20) { by += dir * 8; if (by < 30) { dir = 1; by = mid.y + H; } cand = { ...cand, y: by }; }
+    while (placed.some((b) => boxOverlap(b, cand, 3)) && guard++ < 24) { by += dir * 8; if (by < 30) { dir = 1; by = mid.y + H; } cand = { ...cand, y: by }; }
     placed.push(cand);
     ctx.save(); ctx.textBaseline = 'middle'; ctx.textAlign = 'left';
-    roundRect(ctx, cand.x, cand.y, w, H, 5); ctx.fillStyle = 'rgba(7,10,18,0.85)'; ctx.fill();
-    ctx.strokeStyle = rgb(color, 0.6); ctx.lineWidth = 1; ctx.stroke();
-    ctx.fillStyle = rgb(color, 1); ctx.fillText(text, cand.x + 4, cand.y + H / 2);
+    roundRect(ctx, cand.x, cand.y, w, H, prominent ? 6 : 5);
+    ctx.fillStyle = prominent ? 'rgba(16,20,32,0.96)' : 'rgba(7,10,18,0.78)'; ctx.fill();
+    ctx.strokeStyle = rgb(color, prominent ? 0.85 : 0.4); ctx.lineWidth = prominent ? 1.3 : 1; ctx.stroke();
+    ctx.fillStyle = rgb(color, prominent ? 1 : 0.85); ctx.fillText(text, cand.x + pad, cand.y + H / 2);
     ctx.restore();
   }
 

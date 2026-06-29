@@ -18,14 +18,18 @@ const RIGHT = SPAN / 2;  // X of the live "now" edge
 const TYPE_COLOR = { dns: '#4ad8ff', isp: '#ff8a3d', cloud: '#b78bff' };
 function laneColor(p) { return p.anycast ? '#ffd23f' : (TYPE_COLOR[p.type] || '#4ad8ff'); }
 
-const GOOD = new THREE.Color('#36f1a3');
-const BAD = new THREE.Color('#ff3b6b');
+// SmokePing-style loss colouring: the smoke is green with no loss and shifts
+// through orange to red as packets drop.
+const GOOD = new THREE.Color('#36f1a3');   // 0% loss — green
+const ORANGE = new THREE.Color('#ff9d3d'); // losing packets
+const BAD = new THREE.Color('#ff3b6b');    // heavy loss — red
 
 const tmpColor = new THREE.Color();
-function lossColor(base, loss) {
-  // base colour when healthy, lerping to red as loss climbs
-  tmpColor.copy(base).lerp(BAD, Math.min(1, loss * 1.6));
-  return tmpColor;
+function lossColor(loss) {
+  const f = Math.min(1, Math.max(0, loss || 0));
+  return f <= 0.5
+    ? tmpColor.copy(GOOD).lerp(ORANGE, f / 0.5)
+    : tmpColor.copy(ORANGE).lerp(BAD, (f - 0.5) / 0.5);
 }
 
 class Graph {
@@ -115,14 +119,19 @@ class Graph {
     this.world.add(this.nowPlane);
   }
 
-  _makeLabel(text, color = '#7e88ab', size = 46) {
+  _makeLabel(text, color = '#7e88ab', size = 46, sub = '') {
     const c = document.createElement('canvas');
-    c.width = 256; c.height = 64;
+    c.width = 256; c.height = sub ? 88 : 64;
     const ctx = c.getContext('2d');
     ctx.font = `600 ${size}px ui-monospace, Menlo, monospace`;
     ctx.fillStyle = color;
     ctx.textBaseline = 'middle';
-    ctx.fillText(text, 6, 34);
+    ctx.fillText(text, 6, sub ? 26 : 34);
+    if (sub) {
+      ctx.font = `500 ${Math.round(size * 0.72)}px ui-monospace, Menlo, monospace`;
+      ctx.fillStyle = '#94a2c8';                      // network name — muted
+      ctx.fillText(sub, 6, 64);
+    }
     const tex = new THREE.CanvasTexture(c);
     tex.anisotropy = 4;
     const spr = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
@@ -170,9 +179,11 @@ class Graph {
     lane.pick.position.set(0, HEIGHT / 2, 0);
     lane.pick.userData.laneId = p.id;
 
-    lane.nameSprite = this._makeLabel(`${p.provider || ''} ${p.cc || (p.anycast ? '·' : '')}`.trim(), colorHex, 38);
-    lane.nameSprite.scale.set(26, 6.5, 1);
-    lane.nameSprite.position.set(RIGHT + 12, 4, 0);
+    const net = (p.asName || '').slice(0, 28);    // network (AS) name at the endpoint
+    const head = `${p.provider || ''} ${p.cc || (p.anycast ? '·' : '')}`.trim();
+    lane.nameSprite = this._makeLabel(head, colorHex, 36, net);
+    lane.nameSprite.scale.set(net ? 30 : 26, net ? 10.3 : 6.5, 1);
+    lane.nameSprite.position.set(RIGHT + 14, net ? 5 : 4, 0);
 
     group.add(lane.outer.mesh, lane.inner.mesh, lane.lossMarks, lane.line, lane.head, lane.pick, lane.nameSprite);
     this.world.add(group);
@@ -268,6 +279,37 @@ class Graph {
       this.axisGroup.add(label);
       this._axisLabels.push(label);
     }
+    this._buildTimeAxis(halfZ);
+  }
+
+  // Horizontal (X) time axis along the front-bottom edge: relative ages while
+  // live ("now", "-1m", …), wall-clock times when browsing history.
+  _buildTimeAxis(halfZ) {
+    const { end, spanSec } = this._window();
+    const z = halfZ;
+    const N = 4;
+    for (let i = 0; i <= N; i++) {
+      const frac = i / N;                       // 0 = oldest (left), 1 = now (right)
+      const x = -RIGHT + frac * SPAN;
+      const ageSec = (1 - frac) * spanSec;
+      let text;
+      if (this.mode === 'history') {
+        text = new Date(end - ageSec * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      } else if (ageSec < 1) {
+        text = 'now';
+      } else if (ageSec < 60) {
+        text = `-${Math.round(ageSec)}s`;
+      } else {
+        text = `-${(ageSec / 60).toFixed(ageSec % 60 ? 1 : 0)}m`; // e.g. -1m, -1.5m
+      }
+      // faint vertical gridline at each tick
+      const g = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(x, 0, z), new THREE.Vector3(x, HEIGHT * 0.92, z)]);
+      this.axisGroup.add(new THREE.Line(g, new THREE.LineBasicMaterial({ color: 0x223052, transparent: true, opacity: 0.35 })));
+      const label = this._makeLabel(text, '#6b7aa3', 30);
+      label.scale.set(13, 3.25, 1);
+      label.position.set(x, -3.6, z);
+      this.axisGroup.add(label);
+    }
   }
 
   _onPointerMove(e) {
@@ -345,7 +387,7 @@ class Graph {
     for (let i = 0; i < n; i++) {
       const { x, s } = pts[i];
       lpos[i * 3] = x; lpos[i * 3 + 1] = s.median * yScale; lpos[i * 3 + 2] = 0;
-      const c = lossColor(lane.color, s.loss);
+      const c = lossColor(s.loss);
       lcol[i * 3] = c.r; lcol[i * 3 + 1] = c.g; lcol[i * 3 + 2] = c.b;
     }
     setAttr(lane.line.geometry, 'position', lpos, 3);
@@ -356,7 +398,7 @@ class Graph {
     if (n) {
       const last = pts[n - 1];
       lane.head.position.set(last.x, last.s.median * yScale, 0);
-      lane.head.material.color.copy(lossColor(lane.color, last.s.loss));
+      lane.head.material.color.copy(lossColor(last.s.loss));
       lane.head.visible = true;
     } else lane.head.visible = false;
 
@@ -382,8 +424,8 @@ class Graph {
       const a = pts[i], b = pts[i + 1];
       const aL = lowFn(a.s) * yScale, aH = highFn(a.s) * yScale;
       const bL = lowFn(b.s) * yScale, bH = highFn(b.s) * yScale;
-      const ca = lossColor(this._laneColorFor(band), a.s.loss).clone();
-      const cb = lossColor(this._laneColorFor(band), b.s.loss).clone();
+      const ca = lossColor(a.s.loss).clone();
+      const cb = lossColor(b.s.loss).clone();
       // two triangles: (aL,aH,bH) and (aL,bH,bL)
       put(a.x, aL, ca); put(a.x, aH, ca); put(b.x, bH, cb);
       put(a.x, aL, ca); put(b.x, bH, cb); put(b.x, bL, cb);
@@ -393,10 +435,6 @@ class Graph {
     band.geo.setDrawRange(0, verts);
   }
 
-  _laneColorFor(band) {
-    // bands are owned by a lane; stash a back-ref
-    return band._color || (band._color = new THREE.Color('#4ad8ff'));
-  }
 
   _resize() {
     const w = window.innerWidth, h = window.innerHeight;
@@ -430,9 +468,6 @@ class Graph {
     const yScale = HEIGHT / this.yMax;
 
     for (const lane of this.lanes.values()) {
-      // give each band the lane colour for loss tinting
-      lane.outer._color = lane.color;
-      lane.inner._color = lane.color;
       this._updateLane(lane, end, spanSec, dxPerSec, yScale);
     }
 

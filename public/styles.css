@@ -473,6 +473,13 @@ body.mtr-open #timemachine { opacity: 0; pointer-events: none; transition: opaci
 .globe-label.hot { box-shadow: 0 0 18px color-mix(in srgb, var(--c) 60%, transparent); z-index: 5; }
 .globe-label.hot .gl-name { color: #cdd7f5; }
 
+/* city name next to a destination dot (shown only when zoomed in) */
+.globe-city {
+  position: absolute; top: 0; left: 0; pointer-events: none; white-space: nowrap;
+  font: 600 11px/1 ui-monospace, Menlo, monospace; letter-spacing: .3px; color: #dbe4ff;
+  text-shadow: 0 0 6px rgba(0,0,0,0.95), 0 1px 3px rgba(0,0,0,0.9);
+}
+
 /* view switcher in the top bar */
 .viewswitch { pointer-events: auto; flex: 0 0 auto; display: flex; gap: 4px; padding: 4px;
   background: rgba(16, 22, 40, 0.72); border: 1px solid rgba(120, 140, 200, 0.32);

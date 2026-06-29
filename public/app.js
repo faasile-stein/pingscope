@@ -40,6 +40,7 @@ function globeData() {
     const spread = recent.length ? recent.reduce((a, s) => a + (s.max - s.min), 0) / recent.length : 0;
     return {
       id: p.id, ip: p.ip, label: p.provider || p.label, lat: p.lat, lon: p.lon,
+      city: p.city || '', cc: p.cc || '',
       avg: last ? last.median : null, loss: last ? last.loss : 0, spread,
     };
   });

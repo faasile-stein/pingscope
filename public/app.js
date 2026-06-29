@@ -6,6 +6,9 @@ const canvas = document.getElementById('scene');
 Graph.init(canvas);
 Globe.init(document.getElementById('globe'), document.getElementById('globe-labels'));
 
+// HTML-escape every dynamic value before it goes into innerHTML (prevents XSS
+// from probe/agent/reverse-DNS data).
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const TYPE_COLOR = { dns: '#4ad8ff', isp: '#ff8a3d', cloud: '#b78bff' };
 const laneColor = (p) => (p.anycast ? '#ffd23f' : (TYPE_COLOR[p.type] || '#4ad8ff'));
 const ccFlag = (cc) => (!cc || cc.length !== 2) ? '🌐'
@@ -119,7 +122,7 @@ function buildSelector() {
       const g = document.createElement('div');
       g.className = 'sel-grp';
       const flag = list[0].anycast ? '🌐' : ccFlag(list[0].cc);
-      g.innerHTML = `<div class="sel-grp-h">${flag} ${cc}</div>`;
+      g.innerHTML = `<div class="sel-grp-h">${flag} ${esc(cc)}</div>`;
       for (const p of list) g.appendChild(rowEl(p));
       tEl.appendChild(g);
     }
@@ -132,14 +135,14 @@ function rowEl(p) {
   const r = document.createElement('div');
   r.className = 'sel-row'; r.dataset.id = p.id;
   r.style.setProperty('--c', laneColor(p));
-  const ptrHref = p.ptr ? `//${p.ptr}` : `https://bgp.he.net/ip/${p.ip}`;
-  const ptrTitle = p.ptr ? `open PTR: ${p.ptr}` : `lookup ${p.ip}`;
+  const ptrHref = p.ptr ? `//${encodeURI(p.ptr)}` : `https://bgp.he.net/ip/${encodeURIComponent(p.ip)}`;
+  const ptrTitle = p.ptr ? `open PTR: ${esc(p.ptr)}` : `lookup ${esc(p.ip)}`;
   r.innerHTML =
     `<input type="checkbox" class="sel-cb"${state.selected.has(p.id) ? ' checked' : ''}>` +
     `<span class="sel-dot"></span>` +
-    `<a class="sel-name" href="${ptrHref}" target="_blank" rel="noopener" title="${ptrTitle}">${p.provider}</a>` +
-    `<button class="sel-mtr" title="run MTR → ${p.ip}">mtr</button>` +
-    `<span class="sel-loc">${p.city ? p.city + ', ' : ''}${p.anycast ? 'anycast' : (p.cc || '')}</span>` +
+    `<a class="sel-name" href="${esc(ptrHref)}" target="_blank" rel="noopener" title="${ptrTitle}">${esc(p.provider)}</a>` +
+    `<button class="sel-mtr" title="run MTR → ${esc(p.ip)}">mtr</button>` +
+    `<span class="sel-loc">${p.city ? esc(p.city) + ', ' : ''}${p.anycast ? 'anycast' : esc(p.cc || '')}</span>` +
     `<span class="sel-ms">—</span><span class="sel-loss"></span>`;
   return r;
 }
@@ -238,11 +241,11 @@ Graph.onHover = (info) => {
     ? new Date(when).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : `${ageSec}s ago`;
   readout.innerHTML =
-    `<div><b>${p.provider || lane.label}</b> ${p.anycast ? 'anycast' : (p.cc || '')} · ${stamp}</div>` +
+    `<div><b>${esc(p.provider || lane.label)}</b> ${p.anycast ? 'anycast' : esc(p.cc || '')} · ${stamp}</div>` +
     `<div class="rt">${f(sample.median)}</div>` +
     `<div>min ${f(sample.min)} · max ${f(sample.max)} · loss ${Math.round(sample.loss * 100)}%</div>` +
-    (p.asName ? `<div>${p.as || ''} ${p.asName}</div>` : '') +
-    (p.ptr ? `<div class="muted">${p.ptr}</div>` : '');
+    (p.asName ? `<div>${esc(p.as || '')} ${esc(p.asName)}</div>` : '') +
+    (p.ptr ? `<div class="muted">${esc(p.ptr)}</div>` : '');
 };
 
 // ---------------------------------------------------------------------------
@@ -390,7 +393,6 @@ function lossCss(loss) {
   const [a, b] = f < 0.5 ? [[54, 241, 163], [255, 210, 63]] : [[255, 210, 63], [255, 59, 107]];
   return `rgb(${lerp(a[0], b[0])},${lerp(a[1], b[1])},${lerp(a[2], b[2])})`;
 }
-const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
 
 // ---- vantage points (this server + community agents) ----
 const VANTAGE_COLORS = ['#ff8a3d', '#b78bff', '#36f1a3', '#ff3b6b', '#ffd23f', '#ff6ad5', '#9aff66', '#4adcff'];

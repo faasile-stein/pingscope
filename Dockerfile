@@ -17,6 +17,11 @@ RUN apt-get update \
 # net.ipv4.ping_group_range is wide open. Works with or without NET_RAW.
 RUN setcap -r "$(command -v ping)" 2>/dev/null || true
 
+# Grant raw-socket capability to fping + the mtr helper as FILE capabilities so
+# they keep working when the container runs as the unprivileged `node` user.
+RUN setcap cap_net_raw+ep "$(command -v fping)" \
+    && setcap cap_net_raw+ep "$(command -v mtr-packet)"
+
 WORKDIR /app
 
 # Offline IP geolocation: bundle DB-IP Lite databases (CC-BY, no API key) so the
@@ -47,7 +52,11 @@ COPY . .
 ENV NODE_ENV=production \
     PORT=3000 \
     DB_PATH=/data/pingscope.db
+# Own the data dir + app as the unprivileged user, then drop to it. (For an
+# existing root-owned volume, chown it once to uid 1000 before rolling this image.)
+RUN mkdir -p /data && chown -R node:node /data /app
 VOLUME ["/data"]
 EXPOSE 3000
+USER node
 
 CMD ["npm", "start"]

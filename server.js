@@ -92,19 +92,22 @@ function computeOrigin() {
   return { lat: 50.9871, lon: 1.5897, city: process.env.SERVER_CITY || 'fr1', country: 'France', cc: 'FR' };
 }
 
-// Default visualised set: probes flagged `default`; else top 5 per type×country.
+// Default visualised set on open: any probe flagged `default`, plus one ISP and
+// one cloud provider per country — a geographic spread without overwhelming the
+// view. (Anycast probes have no fixed country, so they're left out of the spread.)
 function computePreselected() {
-  const flagged = PROBES.filter((p) => p.default).map((p) => p.id);
-  if (flagged.length) return flagged;
-  const groups = new Map();
-  for (const p of PROBES) {
-    const key = `${p.type}|${p.anycast ? 'anycast' : p.cc || '??'}`;
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(p);
+  const sel = new Set(PROBES.filter((p) => p.default).map((p) => p.id));
+  const seen = new Set();
+  for (const type of ['isp', 'cloud']) {
+    for (const p of PROBES) {
+      if (p.type !== type || p.anycast) continue;
+      const key = `${type}|${p.cc || p.country}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      sel.add(p.id);
+    }
   }
-  const sel = [];
-  for (const list of groups.values()) sel.push(...list.slice(0, 5).map((p) => p.id));
-  return sel;
+  return [...sel];
 }
 
 // Non-ephemeral storage: a SQLite file. In Docker this lives on a mounted
@@ -223,6 +226,39 @@ function seedHistory() {
 const app = express();
 app.set('trust proxy', true); // behind bootload's proxy → correct req.protocol/host
 
+// Content-Security-Policy. Allows: our own assets; the Three.js modules on unpkg
+// (resolved via the inline import-map, which gets a per-request nonce); the
+// world-atlas TopoJSON fetched from jsdelivr; same-origin WebSocket. `nonce`
+// null = the strict baseline used for static assets (no inline script allowed).
+function csp(nonce) {
+  return [
+    "default-src 'self'",
+    "base-uri 'self'",
+    "object-src 'none'",
+    "frame-ancestors 'none'",
+    "form-action 'self'",
+    "img-src 'self' data:",
+    "style-src 'self' 'unsafe-inline'",
+    `script-src 'self' https://unpkg.com${nonce ? ` 'nonce-${nonce}'` : ''}`,
+    "connect-src 'self' https://cdn.jsdelivr.net",
+    "font-src 'self'",
+  ].join('; ');
+}
+
+// Security headers on every response.
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), interest-cohort=()');
+  res.setHeader('Content-Security-Policy', csp(null));
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
+
 // ---- shareable MTR views: inject Open Graph tags + a dynamic preview image ----
 const INDEX_HTML = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
 const xmlEsc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -263,7 +299,12 @@ app.get('/', (req, res) => {
   }
   // never cache the shell, so new builds (and their JS/CSS) show up on reload
   res.set('Cache-Control', 'no-store');
-  res.type('html').send(INDEX_HTML.replace('<!--OG-->', tags));
+  // per-request nonce authorises the inline import-map without 'unsafe-inline'
+  const nonce = crypto.randomBytes(16).toString('base64');
+  res.setHeader('Content-Security-Policy', csp(nonce));
+  res.type('html').send(
+    INDEX_HTML.replace('<!--OG-->', tags).replace(/__CSP_NONCE__/g, nonce),
+  );
 });
 
 // Dynamic Open Graph preview image (SVG, 1200×630).

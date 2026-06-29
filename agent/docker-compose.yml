@@ -4,11 +4,12 @@ services:
     image: pingscope-agent
     container_name: pingscope-agent
     restart: unless-stopped
-    # only raw sockets for mtr; everything else dropped
+    # runs as the unprivileged `node` user (see Dockerfile). Everything is dropped
+    # except NET_RAW, which the mtr helper picks up via a file capability — so the
+    # most this container can ever do is open a raw socket. read_only root fs too.
     cap_drop: ["ALL"]
     cap_add: ["NET_RAW"]
     read_only: true
-    security_opt: ["no-new-privileges:true"]
     environment:
       # public community join token for pingscope.net (preconfigured; override
       # only if you point PINGSCOPE_URL at your own server)

@@ -66,9 +66,22 @@ four columns above. Hostnames are resolved to IPs on boot. Edit the file and
 restart; point elsewhere with `PROBES_CONF=/path/to/probes.conf`.
 
 All probes are pinged every second with **`fping`** (one process for the whole
-set). The left-hand **selector** chooses which to visualise (default = whatever
-is flagged `default`, else the top 5 per type × country). Each row has an `mtr`
-button (live latency map) and links the name to the probe's PTR.
+set). The left-hand **selector** chooses which to visualise; on open it
+preselects any `default`-flagged probe plus **one ISP and one cloud provider per
+country** (a geographic spread). Each row has an `mtr` button (live latency map)
+and links the name to the probe's PTR.
+
+### Want your network in the default catalog?
+
+If you'd like your **IP(s) / network (AS)** added to the shared default
+`probes.conf` on **pingscope.net**, open a
+[**GitHub issue**](https://github.com/faasile-stein/pingscope/issues/new) with:
+
+- the **IP address(es)** to ping (pingable, public, stable),
+- the **network / AS name** and **country**,
+- the **type** (`dns`, `isp`, or `cloud`).
+
+We'll review and add them. (Running your own instance? Just edit `probes.conf`.)
 
 ## How it works
 

@@ -26,6 +26,7 @@ function lossColor(loss) { // 0..1 -> green→amber→red
   const c = new THREE.Color();
   return f <= 0.5 ? c.copy(GOOD).lerp(WARN, f / 0.5) : c.copy(WARN).lerp(BAD, (f - 0.5) / 0.5);
 }
+const escHtml = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 class Globe {
   constructor() {
@@ -191,17 +192,19 @@ class Globe {
       labelEl.style.setProperty('--c', `#${col.getHexString()}`);
       labelEl.innerHTML = `<b>${p.avg != null ? p.avg.toFixed(p.avg < 10 ? 1 : 0) : '—'}ms</b>`
         + (p.loss > 0 ? ` <i>${Math.round(p.loss * 100)}%</i>` : '')
-        + `<span class="gl-name">${p.label || p.ip}</span>`;
+        + `<span class="gl-name">${escHtml(p.label || p.ip)}</span>`;
       labelEl.title = `${p.label || ''} ${p.ip} — open MTR`;
       labelEl.addEventListener('click', (e) => { e.stopPropagation(); this.onSelect && this.onSelect(p); });
       this.labelLayer.appendChild(labelEl);
 
-      // city name next to the dot — only revealed when zoomed in (see _updateLabels)
+      // dot label: city name when zoomed in, plus the network (AS) name once you
+      // zoom to country level. Both gated in _updateLabels.
       let cityEl = null;
-      if (p.city) {
+      if (p.city || p.net) {
         cityEl = document.createElement('div');
         cityEl.className = 'globe-city';
-        cityEl.textContent = p.city;
+        cityEl.innerHTML = (p.city ? `<span class="gc-city">${escHtml(p.city)}</span>` : '')
+          + (p.net ? `<span class="gc-net">${escHtml(p.net)}</span>` : '');
         cityEl.style.display = 'none';
         this.labelLayer.appendChild(cityEl);
       }
@@ -239,7 +242,9 @@ class Globe {
   _updateLabels() {
     const camDir = this.camera.position.clone().normalize();
     const w = this.canvas.clientWidth, h = this.canvas.clientHeight;
-    const showCity = this.camera.position.distanceTo(this.controls.target) < 2.2; // zoomed in
+    const dist = this.camera.position.distanceTo(this.controls.target);
+    const showCity = dist < 2.2;     // zoomed in → city
+    const countryLevel = dist < 1.5; // closer (country fills the view) → + network name
     for (const a of this.arcs.values()) {
       const facing = a.dstN.dot(camDir) > -0.15;        // hide labels on the far side
       // RTT label at the arc apex
@@ -248,11 +253,13 @@ class Globe {
         a.labelEl.style.display = '';
         a.labelEl.style.transform = `translate(-50%,-50%) translate(${(v.x * 0.5 + 0.5) * w}px,${(-v.y * 0.5 + 0.5) * h}px)`;
       } else { a.labelEl.style.display = 'none'; }
-      // city name next to the destination dot — only when zoomed in
+      // city name next to the destination dot — only when zoomed in; the network
+      // (AS) name is added once you zoom to country level
       if (a.cityEl) {
         const dv = a.dot.position.clone().project(this.camera);
         if (showCity && a.dstN.dot(camDir) > 0.02 && dv.z < 1) {
           a.cityEl.style.display = '';
+          a.cityEl.classList.toggle('country', countryLevel);
           a.cityEl.style.transform = `translate(0,-50%) translate(${(dv.x * 0.5 + 0.5) * w + 9}px,${(-dv.y * 0.5 + 0.5) * h}px)`;
         } else { a.cityEl.style.display = 'none'; }
       }

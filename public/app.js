@@ -1,10 +1,12 @@
 import Graph from './graph.js';
 import MtrMap from './mtr.js';
 import Globe from './globe.js';
+import Overview from './overview.js';
 
 const canvas = document.getElementById('scene');
 Graph.init(canvas);
 Globe.init(document.getElementById('globe'), document.getElementById('globe-labels'));
+Overview.init(document.getElementById('overview'));
 
 // HTML-escape every dynamic value before it goes into innerHTML (prevents XSS
 // from probe/agent/reverse-DNS data).
@@ -24,11 +26,46 @@ const state = {
   tickMs: 1000,
   view: { mode: 'live', rangeMs: null, to: null },
   viewMode: 'graph',   // 'graph' (3D smoke) | 'globe'
+  graphMode: 'top',    // 'top' (10 worst-loss as 3D lanes) | 'all' (2D overview grid)
   origin: null,
   filterType: 'all',
   search: '',
 };
 const selectedProbes = () => state.probes.filter((p) => state.selected.has(p.id));
+
+// ---------------------------------------------------------------------------
+// Graph lane set: focus on the 10 networks with the most loss (recent), so the
+// 3D view stays readable. "Show all" switches to the 2D overview grid instead.
+// ---------------------------------------------------------------------------
+function recentLoss(id) {
+  const buf = state.live.get(id) || [];
+  const r = buf.slice(-90);
+  if (r.length) return r.reduce((a, s) => a + (s.loss || 0), 0) / r.length;
+  return state.latest.get(id) ? state.latest.get(id).loss : 0;
+}
+function topLossProbes(limit = 10) {
+  return selectedProbes()
+    .map((p) => ({ p, loss: recentLoss(p.id), lat: (state.latest.get(p.id) || {}).median || 0 }))
+    .sort((a, b) => (b.loss - a.loss) || (b.lat - a.lat))
+    .slice(0, limit)
+    .map((x) => x.p);
+}
+const graphLanes = () => (state.graphMode === 'all' ? [] : topLossProbes(10));
+
+function overviewData() {
+  return selectedProbes().map((p) => ({
+    id: p.id, label: p.provider || p.label, net: p.asName || '', cc: p.cc || '',
+    anycast: !!p.anycast, samples: state.live.get(p.id) || [],
+  }));
+}
+let _ovT = 0;
+function refreshOverview(force) {
+  if (!(state.viewMode === 'graph' && state.graphMode === 'all')) return;
+  const now = Date.now();
+  if (!force && now - _ovT < 600) return;
+  _ovT = now;
+  Overview.render(overviewData());
+}
 
 // ---------------------------------------------------------------------------
 // Globe view — arcs from this server to each selected destination
@@ -66,15 +103,55 @@ function setView(mode) {
   if (mode === 'globe') {
     Graph.pause();
     canvas.style.display = 'none';
+    Overview.hide();
     Globe.show();
     refreshGlobe(true);
   } else {
     Globe.hide();
-    canvas.style.display = '';
-    Graph.resume();
+    applyGraphMode();
   }
 }
 document.querySelectorAll('.vbtn').forEach((b) => (b.onclick = () => setView(b.dataset.view)));
+
+// graph sub-mode: 3D top-10 lanes vs the 2D "show all" overview grid
+function applyGraphMode() {
+  const all = state.graphMode === 'all';
+  document.body.classList.toggle('graph-all', all);
+  const btn = document.getElementById('btn-showall');
+  btn.classList.toggle('on', all);
+  btn.textContent = all ? '▲ worst 10' : '▦ show all';
+  if (state.viewMode !== 'graph') { Overview.hide(); return; }
+  if (all) {
+    Graph.pause();
+    canvas.style.display = 'none';
+    Overview.show();
+    refreshOverview(true);
+  } else {
+    Overview.hide();
+    canvas.style.display = '';
+    Graph.resume();
+    applySelection();
+  }
+}
+function setGraphMode(m) { if (m !== state.graphMode) { state.graphMode = m; applyGraphMode(); } }
+document.getElementById('btn-showall').onclick = () => setGraphMode(state.graphMode === 'all' ? 'top' : 'all');
+
+// periodically refresh which 10 networks are shown (worst loss), without churn
+let _topT = 0, _topIds = '';
+function maybeRecomputeTop() {
+  if (state.viewMode !== 'graph' || state.graphMode !== 'top' || state.view.mode !== 'live') return;
+  const now = Date.now();
+  if (now - _topT < 12000) return;
+  _topT = now;
+  const lanes = topLossProbes(10);
+  const ids = lanes.map((p) => p.id).join(',');
+  if (ids === _topIds) return;
+  _topIds = ids;
+  Graph.setSelection(lanes);
+  for (const p of lanes) Graph.setHistory(p.id, state.live.get(p.id) || []);
+  Graph.setLiveMode();
+}
+
 setView('globe'); // open on the globe by default
 
 // click an arc/label → keep the probe in the smoke graph, then open its MTR
@@ -168,15 +245,16 @@ function toggleSelect(id, on) {
 }
 
 function applySelection() {
-  const sel = selectedProbes();
-  Graph.setSelection(sel);
+  const lanes = graphLanes();          // 3D shows the 10 worst-loss (or none in "all" mode)
+  Graph.setSelection(lanes);
   if (state.view.mode === 'live') {
-    for (const p of sel) Graph.setHistory(p.id, state.live.get(p.id) || []);
+    for (const p of lanes) Graph.setHistory(p.id, state.live.get(p.id) || []);
     Graph.setLiveMode();
   } else {
     enterHistory(state.view.rangeMs, state.view.to);
   }
   refreshGlobe(true);
+  refreshOverview(true);
 }
 
 async function seedHistory(id) {
@@ -270,13 +348,10 @@ function connect() {
       state.tickMs = msg.tickMs || 1000;
       state.selected = new Set(msg.preselected);
       buildSelector();
-      const sel = selectedProbes();
-      Graph.setSelection(sel);
-      for (const p of sel) {
-        const h = msg.history[p.id] || [];
-        state.live.set(p.id, h.slice(-600));
-        Graph.setHistory(p.id, h);
-      }
+      for (const p of selectedProbes()) state.live.set(p.id, (msg.history[p.id] || []).slice(-600));
+      const lanes = graphLanes();
+      Graph.setSelection(lanes);
+      for (const p of lanes) Graph.setHistory(p.id, state.live.get(p.id) || []);
       state.agents = msg.agents || [];
       renderVantages();
       state.origin = msg.origin || null;
@@ -298,6 +373,8 @@ function connect() {
         }
       }
       refreshGlobe();
+      refreshOverview();
+      maybeRecomputeTop();
     } else if (msg.type === 'mtr') {
       handleMtr(msg);
     }
@@ -317,7 +394,7 @@ btnPause.onclick = () => {
 };
 const windowRange = document.getElementById('window-range');
 const windowVal = document.getElementById('window-val');
-windowRange.oninput = () => { windowVal.textContent = windowRange.value + 's'; Graph.setWindow(+windowRange.value); };
+windowRange.oninput = () => { windowVal.textContent = windowRange.value + 's'; Graph.setWindow(+windowRange.value); Overview.setWindow(+windowRange.value); refreshOverview(true); };
 
 // ---------------------------------------------------------------------------
 // Time machine — browse historic stats like SmokePing
@@ -337,9 +414,10 @@ function goLive() {
   tmPrev.disabled = tmNext.disabled = true;
   tmLabel.textContent = 'streaming live';
   windowRange.disabled = false;
-  for (const p of selectedProbes()) Graph.setHistory(p.id, state.live.get(p.id) || []);
+  for (const p of graphLanes()) Graph.setHistory(p.id, state.live.get(p.id) || []);
   Graph.setWindow(+windowRange.value);
   Graph.setLiveMode();
+  refreshOverview(true);
 }
 
 const fmt = (ts) => new Date(ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
@@ -353,7 +431,7 @@ async function enterHistory(rangeMs, toOverride) {
   tmPrev.disabled = false;
   tmNext.disabled = to >= Date.now();
   tmLabel.textContent = `${fmt(from)} → ${fmt(to)}`;
-  const ids = [...state.selected];
+  const ids = graphLanes().map((p) => p.id);
   if (!ids.length) { Graph.setHistoryWindow(from, to); return; }
   try {
     const res = await fetch(`/api/history?target=${ids.join(',')}&from=${from}&to=${to}&buckets=240`);

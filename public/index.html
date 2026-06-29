@@ -85,12 +85,17 @@
     <div class="hud-row controls">
       <button id="btn-rotate" class="toggle on">auto-rotate</button>
       <button id="btn-pause" class="toggle">pause feed</button>
+      <button id="btn-showall" class="toggle" title="show every selected probe as 2D smoke graphs">▦ show all</button>
       <label class="range">window
         <input id="window-range" type="range" min="30" max="300" step="10" value="120" />
         <span id="window-val">120s</span>
       </label>
     </div>
+    <div class="hud-row" id="graph-note">showing the <b>10 networks with most loss</b></div>
   </div>
+
+  <!-- "show all" — 2D SmokePing-style small-multiples grid -->
+  <div id="overview" class="overview" style="display:none"></div>
 
   <section id="mtrpanel">
     <div class="mtr-head">

@@ -50,8 +50,13 @@ class MtrMap {
     this._raf = null;
     this.onHover = null;
     this.hover = null;
+    this.focus = null;         // when set, only this vantage's path is drawn
+    this._legendHits = [];     // clickable legend rows (geo view)
   }
   setMode(m) { this.mode = m; }
+  setFocus(source) { this.focus = (source && this.tracks.has(source)) ? source : null; }
+  // tracks to draw: a single soloed vantage, else all of them
+  _order() { return (this.focus && this.tracks.has(this.focus)) ? [this.focus] : this.order; }
 
   init(canvas) {
     this.canvas = canvas;
@@ -74,7 +79,21 @@ class MtrMap {
       setPtr(e);
       this._pointers.set(e.pointerId, xy(e));
       this._gesturePrev = null;          // start a fresh gesture
+      this._downXY = xy(e);              // for the click-vs-drag guard
       try { canvas.setPointerCapture(e.pointerId); } catch { /* ignore */ }
+    });
+    // click a vantage in the geo legend to solo its path (click again = show all)
+    canvas.addEventListener('click', (e) => {
+      if (this.mode !== 'geo' || !this._legendHits.length) return;
+      const p = xy(e);
+      if (this._downXY && Math.hypot(p.x - this._downXY.x, p.y - this._downXY.y) > 6) return; // was a drag
+      for (const hit of this._legendHits) {
+        if (p.x >= hit.left && p.x <= hit.right && p.y >= hit.top && p.y <= hit.bottom) {
+          this.setFocus(this.focus === hit.source ? null : hit.source);
+          this._resetGeoView();          // refit to the (now filtered) path
+          return;
+        }
+      }
     });
     const endPtr = (e) => { this._pointers.delete(e.pointerId); if (!this._pointers.size) this._gesturePrev = null; };
     canvas.addEventListener('pointerup', endPtr);
@@ -120,6 +139,7 @@ class MtrMap {
     this.target = target;
     this.tracks.clear();
     this.order = [];
+    this.focus = null;
     this.running = true;
     this._t0 = performance.now();
     this._asColor = new Map();
@@ -175,9 +195,10 @@ class MtrMap {
     this.maxAxis = niceMax(peak * 1.08);
     this._drawRuler(ctx);
 
-    const n = Math.max(1, this.order.length);
+    const order = this._order();
+    const n = Math.max(1, order.length);
     const bandH = (this.H - PAD_TOP - PAD_BOT) / n;
-    this.order.forEach((source, i) => {
+    order.forEach((source, i) => {
       const track = this.tracks.get(source);
       const top = PAD_TOP + i * bandH;
       this._layoutTrack(track, top, bandH);
@@ -238,7 +259,8 @@ class MtrMap {
     this._ensureBorders();
     const GL = 24, GR = 24, GT = 56, GB = 26;
     const all = [];
-    for (const source of this.order) {
+    const order = this._order();
+    for (const source of order) {
       const track = this.tracks.get(source);
       // cumulative RTT (monotonic running-max of avg) over ALL responding hops —
       // drives both the per-leg latency and the speed-of-light sanity filter.
@@ -316,7 +338,7 @@ class MtrMap {
       return this._asColor.get(asn);
     };
     const asOrder = [], asOrg = new Map();
-    for (const source of this.order) {
+    for (const source of order) {
       const track = this.tracks.get(source), g = track._geo || [];
       g.forEach((h, i) => {
         if (h.geo.asn && !asOrg.has(h.geo.asn)) asOrg.set(h.geo.asn, h.geo.org || `AS${h.geo.asn}`); // org from the real hop
@@ -329,7 +351,7 @@ class MtrMap {
     // routes — solid AS colour within an AS; a handoff leg fades from the
     // leaving AS's colour to the entering AS's colour, marking where the path
     // crosses between networks.
-    for (const source of this.order) {
+    for (const source of order) {
       const track = this.tracks.get(source), g = track._geo;
       for (let i = 1; i < g.length; i++) {
         const pa = project(g[i - 1].geo.lon, g[i - 1].geo.lat), pb = project(g[i].geo.lon, g[i].geo.lat);
@@ -348,7 +370,7 @@ class MtrMap {
       if (g.length >= 2) this._geoPackets(ctx, g, project, time);
     }
     // dots: loss-coloured fill + AS-coloured ring; hover-pick when not panning
-    for (const source of this.order) {
+    for (const source of order) {
       const track = this.tracks.get(source);
       (track._geo || []).forEach((h, idx) => {
         const p = project(h.geo.lon, h.geo.lat);
@@ -371,7 +393,7 @@ class MtrMap {
     }
     // labels: per-segment latency at each leg's midpoint + city names at hops
     const placed = [];
-    for (const source of this.order) {
+    for (const source of order) {
       const track = this.tracks.get(source), g = track._geo || [];
       // Per-leg latency from the monotonic running-max cum (computed up top over
       // ALL responding hops, incl. private/unlocated and filtered-out ones) — so a
@@ -507,14 +529,31 @@ class MtrMap {
     ctx.restore();
   }
 
+  // Vantage legend (top-right). Lists ALL vantages; with more than one, each row
+  // is clickable to solo that path (and the soloed one is highlighted). Rows are
+  // recorded in this._legendHits for the canvas click handler.
   _geoLegend(ctx) {
+    this._legendHits = [];
+    const multi = this.order.length > 1;
     ctx.save(); ctx.font = '11px ui-monospace, Menlo, monospace'; ctx.textBaseline = 'middle';
     let y = 64;
+    if (multi) {
+      ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(126,136,171,0.85)';
+      ctx.fillText(this.focus ? 'showing 1 · click to reset' : 'click a vantage to solo', this.W - 12, y);
+      y += 20;
+    }
     for (const source of this.order) {
       const track = this.tracks.get(source);
-      ctx.fillStyle = rgb(track.color, 1); ctx.beginPath(); ctx.arc(this.W - 16, y, 4, 0, Math.PI * 2); ctx.fill();
-      ctx.textAlign = 'right'; ctx.fillStyle = 'rgba(206,214,240,0.9)';
+      const dim = this.focus && this.focus !== source;
+      const a = dim ? 0.32 : 1;
+      if (this.focus === source) { // highlight the soloed row
+        ctx.fillStyle = 'rgba(74,216,255,0.12)';
+        roundRect(ctx, this.W - 232, y - 9, 220, 18, 5); ctx.fill();
+      }
+      ctx.fillStyle = rgb(track.color, a); ctx.beginPath(); ctx.arc(this.W - 16, y, 4, 0, Math.PI * 2); ctx.fill();
+      ctx.textAlign = 'right'; ctx.fillStyle = `rgba(206,214,240,${dim ? 0.4 : 0.9})`;
       ctx.fillText(track.label.slice(0, 28), this.W - 26, y);
+      if (multi) this._legendHits.push({ source, left: this.W - 232, right: this.W, top: y - 9, bottom: y + 9 });
       y += 18;
     }
     ctx.restore();

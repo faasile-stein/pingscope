@@ -22,6 +22,8 @@ html, body {
   color: var(--txt);
   font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
   overflow: hidden;
+  overscroll-behavior: none;   /* no pull-to-refresh / scroll-chaining bounce */
+  -webkit-tap-highlight-color: transparent;
   user-select: none;
 }
 
@@ -174,7 +176,7 @@ body::after {
 /* ---- time machine (top centre) ---- */
 #timemachine {
   position: fixed;
-  top: 16px; left: 50%;
+  top: 62px; left: 50%;        /* below the top bar so it never covers the view switcher */
   transform: translateX(-50%);
   z-index: 5;
   display: flex;
@@ -310,7 +312,9 @@ body::after {
   backdrop-filter: blur(12px);
   transition: opacity .35s ease;
 }
-.mtr-stage.hidden { opacity: 0; pointer-events: none; }
+/* visibility:hidden so the stage's pointer-events:auto children (share/close/view)
+   stop swallowing taps at the top of the screen while the MTR is closed */
+.mtr-stage.hidden { opacity: 0; pointer-events: none; visibility: hidden; }
 .stage-head {
   position: absolute; top: 0; left: 0; right: 0;
   display: flex; align-items: center; justify-content: space-between;

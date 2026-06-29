@@ -35,7 +35,7 @@ const ms = (v) => (v == null ? '—' : (v < 10 ? v.toFixed(1) : Math.round(v)) +
 const PADL = 30, PADB = 14, PADT = 6, PADR = 4; // axis margins inside each canvas
 
 class Overview {
-  constructor() { this.cells = new Map(); this.windowSec = 120; this.visible = false; }
+  constructor() { this.cells = new Map(); this.live = true; this.spanMs = 120000; this.end = 0; this.visible = false; }
 
   init(container) {
     this.container = container;
@@ -45,7 +45,8 @@ class Overview {
       + '<i style="background:linear-gradient(90deg,#2ecc40,#ffdc00,#ff851b,#ff4136,#b10dc9)"></i>'
       + '<span class="ov-lg0">0%</span><span class="ov-lg1">100%</span>';
   }
-  setWindow(sec) { this.windowSec = sec; }
+  setLiveWindow(sec) { this.live = true; this.spanMs = sec * 1000; }
+  setHistoryWindow(from, to) { this.live = false; this.end = to; this.spanMs = Math.max(1000, to - from); }
   show() { this.visible = true; this.container.style.display = ''; }
   hide() { this.visible = false; this.container.style.display = 'none'; }
 
@@ -89,8 +90,8 @@ class Overview {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cw, ch);
 
-    const now = Date.now(), span = this.windowSec * 1000;
-    const vis = (p.samples || []).filter((s) => now - s.t <= span + 1000);
+    const now = this.live ? Date.now() : this.end, span = this.spanMs;
+    const vis = (p.samples || []).filter((s) => now - s.t <= span + 1000 && s.t <= now + 1000);
     const last = vis.length ? vis[vis.length - 1] : null;
 
     // header + footer stats
@@ -119,9 +120,16 @@ class Overview {
     }
     ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'center';
     for (let i = 0; i <= 2; i++) {
-      const frac = i / 2, x = PADL + frac * plotW, ageSec = (1 - frac) * this.windowSec;
-      const t = ageSec < 1 ? 'now' : ageSec < 60 ? `-${Math.round(ageSec)}s` : `-${(ageSec / 60).toFixed(ageSec % 60 ? 1 : 0)}m`;
-      ctx.fillStyle = 'rgba(126,136,171,0.55)'; ctx.fillText(t, Math.min(cw - 14, Math.max(PADL + 10, x)), ch - 3);
+      const frac = i / 2, x = PADL + frac * plotW;
+      let t;
+      if (this.live) {
+        const ageSec = (1 - frac) * (span / 1000);
+        t = ageSec < 1 ? 'now' : ageSec < 60 ? `-${Math.round(ageSec)}s` : `-${(ageSec / 60).toFixed(ageSec % 60 ? 1 : 0)}m`;
+      } else {
+        const d = new Date(now - (1 - frac) * span);
+        t = span > 2 * 864e5 ? d.toLocaleDateString([], { month: 'short', day: 'numeric' }) : d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      }
+      ctx.fillStyle = 'rgba(126,136,171,0.55)'; ctx.fillText(t, Math.min(cw - 16, Math.max(PADL + 12, x)), ch - 3);
     }
     if (vis.length < 2) return;
 

@@ -22,6 +22,7 @@ const state = {
   selected: new Set(),
   latest: new Map(),   // id -> last sample (for selector live stats)
   live: new Map(),     // id -> rolling buffer (selected probes)
+  overviewHist: new Map(), // id -> fetched history for the overview (history mode)
   paused: false,
   tickMs: 1000,
   view: { mode: 'live', rangeMs: null, to: null },
@@ -53,9 +54,11 @@ function topLossProbes(limit = 10) {
 const graphLanes = () => (state.graphMode === 'all' ? [] : topLossProbes(10));
 
 function overviewData() {
+  const hist = state.view.mode === 'history';
   return selectedProbes().map((p) => ({
     id: p.id, label: p.provider || p.label, net: p.asName || '', cc: p.cc || '',
-    anycast: !!p.anycast, samples: state.live.get(p.id) || [],
+    anycast: !!p.anycast,
+    samples: hist ? (state.overviewHist.get(p.id) || []) : (state.live.get(p.id) || []),
   }));
 }
 let _ovT = 0;
@@ -125,7 +128,8 @@ function applyGraphMode() {
     Graph.pause();
     canvas.style.display = 'none';
     Overview.show();
-    refreshOverview(true);
+    if (state.view.mode === 'history') enterHistory(state.view.rangeMs, state.view.to);
+    else { Overview.setLiveWindow(+windowRange.value); refreshOverview(true); }
   } else {
     Overview.hide();
     canvas.style.display = '';
@@ -394,7 +398,7 @@ btnPause.onclick = () => {
 };
 const windowRange = document.getElementById('window-range');
 const windowVal = document.getElementById('window-val');
-windowRange.oninput = () => { windowVal.textContent = windowRange.value + 's'; Graph.setWindow(+windowRange.value); Overview.setWindow(+windowRange.value); refreshOverview(true); };
+windowRange.oninput = () => { windowVal.textContent = windowRange.value + 's'; Graph.setWindow(+windowRange.value); Overview.setLiveWindow(+windowRange.value); refreshOverview(true); };
 
 // ---------------------------------------------------------------------------
 // Time machine — browse historic stats like SmokePing
@@ -414,6 +418,8 @@ function goLive() {
   tmPrev.disabled = tmNext.disabled = true;
   tmLabel.textContent = 'streaming live';
   windowRange.disabled = false;
+  state.overviewHist = new Map();
+  Overview.setLiveWindow(+windowRange.value);
   for (const p of graphLanes()) Graph.setHistory(p.id, state.live.get(p.id) || []);
   Graph.setWindow(+windowRange.value);
   Graph.setLiveMode();
@@ -431,12 +437,20 @@ async function enterHistory(rangeMs, toOverride) {
   tmPrev.disabled = false;
   tmNext.disabled = to >= Date.now();
   tmLabel.textContent = `${fmt(from)} → ${fmt(to)}`;
-  const ids = graphLanes().map((p) => p.id);
-  if (!ids.length) { Graph.setHistoryWindow(from, to); return; }
+  Overview.setHistoryWindow(from, to);
+  // "show all" needs history for every selected probe; the 3D view only its lanes
+  const showAll = state.graphMode === 'all';
+  const ids = showAll ? [...state.selected] : graphLanes().map((p) => p.id);
+  if (!ids.length) { Graph.setHistoryWindow(from, to); refreshOverview(true); return; }
   try {
     const res = await fetch(`/api/history?target=${ids.join(',')}&from=${from}&to=${to}&buckets=240`);
     const data = await res.json();
-    for (const id of ids) Graph.setHistory(id, data.targets[id] || []);
+    if (showAll) {
+      state.overviewHist = new Map(ids.map((id) => [id, data.targets[id] || []]));
+      refreshOverview(true);
+    } else {
+      for (const id of ids) Graph.setHistory(id, data.targets[id] || []);
+    }
     Graph.setHistoryWindow(from, to);
   } catch (e) {
     tmLabel.textContent = 'history fetch failed';

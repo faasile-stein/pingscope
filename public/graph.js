@@ -52,7 +52,7 @@ class Graph {
     this.renderer.setSize(w, h);
 
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x05060c, 0.0042);
+    this.scene.fog = new THREE.FogExp2(0x05060c, 0.0022); // light — keep distant lanes legible
 
     this.camera = new THREE.PerspectiveCamera(52, w / h, 0.1, 2000);
     this.camera.position.set(96, 78, 150);
@@ -180,6 +180,7 @@ class Graph {
     lane.pick.userData.laneId = p.id;
 
     const net = (p.asName || '').slice(0, 28);    // network (AS) name at the endpoint
+    lane.hasNet = !!net;
     const head = `${p.provider || ''} ${p.cc || (p.anycast ? '·' : '')}`.trim();
     lane.nameSprite = this._makeLabel(head, colorHex, 36, net);
     lane.nameSprite.scale.set(net ? 30 : 26, net ? 10.3 : 6.5, 1);
@@ -200,16 +201,18 @@ class Graph {
 
   _relayout() {
     const n = this.lanes.size;
-    const gap = n > 1 ? Math.min(LANE_GAP, 560 / (n - 1)) : 0;
+    const gap = n > 1 ? Math.min(LANE_GAP, 440 / (n - 1)) : 0; // keep the stack compact
     this._gap = gap;
-    const showLabels = n <= 16;
+    const lf = n > 24 ? 0.6 : n > 14 ? 0.78 : 1; // shrink endpoint labels when crowded
     let i = 0;
     for (const id of (this._order || [...this.lanes.keys()])) {
       const lane = this.lanes.get(id);
       if (!lane) continue;
       const z = (i - (n - 1) / 2) * gap;
       lane.z = z; lane.group.position.z = z;
-      lane.nameSprite.visible = showLabels;
+      lane.nameSprite.visible = true; // always show the network name
+      const w = lane.hasNet ? 30 : 26, h = lane.hasNet ? 10.3 : 6.5;
+      lane.nameSprite.scale.set(w * lf, h * lf, 1);
       i++;
     }
   }

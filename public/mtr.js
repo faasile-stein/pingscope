@@ -479,7 +479,9 @@ class MtrMap {
     ctx.save();
     ctx.font = '10px ui-monospace, Menlo, monospace';
     ctx.fillStyle = 'rgba(126,136,171,0.7)'; ctx.textAlign = 'right';
-    ctx.fillText('scroll / pinch to zoom · drag to pan · double-click to fit', this.W - 12, this.H - 10);
+    // short form on narrow screens so it stays clear of the AS legend (bottom-left)
+    const text = this.W < 600 ? 'pinch · drag · 2-tap to fit' : 'scroll / pinch to zoom · drag to pan · double-click to fit';
+    ctx.fillText(text, this.W - 12, this.H - 10);
     ctx.restore();
   }
 

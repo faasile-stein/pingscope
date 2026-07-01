@@ -385,6 +385,9 @@ body.mtr-open #timemachine { opacity: 0; pointer-events: none; transition: opaci
 .eu-title { color: #cdd7f5; font-weight: 600; margin-bottom: 4px; }
 .eu-row { display: flex; justify-content: space-between; gap: 14px; }
 .eu-row b { font-weight: 700; }
+.eu-dest { margin-top: 6px; font-weight: 700; font-size: 11px; }
+.eu-dest .eu-ok { color: var(--good); }
+.eu-dest .eu-bad { color: #ff5d6c; }
 .eu-note { margin-top: 5px; font-size: 10px; color: var(--muted); opacity: .8; }
 @media (max-width: 720px) {
   .eu-box { top: 46px; left: 8px; padding: 7px 10px; min-width: 132px; font-size: 10.5px; }

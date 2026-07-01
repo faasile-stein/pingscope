@@ -559,6 +559,7 @@ function openMtr(ip) {
   document.body.classList.add('mtr-open');
   euEls.hops.textContent = euEls.nets.textContent = '—';
   euEls.hops.style.color = euEls.nets.style.color = '';
+  euEls.dest.textContent = '';
   euEls.note.textContent = 'resolving…';
   MtrMap.open(ip);
   ws.send(JSON.stringify({ type: 'mtr', ip, vantages: [...state.vantages] }));
@@ -618,11 +619,11 @@ function updateStageMeta() {
 
 // ---- route "sovereignty": share of hops / networks located outside the EU ----
 const EU_CC = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE']);
-const euEls = { hops: document.getElementById('eu-hops'), nets: document.getElementById('eu-nets'), note: document.getElementById('eu-note') };
+const euEls = { hops: document.getElementById('eu-hops'), nets: document.getElementById('eu-nets'), dest: document.getElementById('eu-dest'), note: document.getElementById('eu-note') };
 const pctColor = (p) => `rgb(${[54 + (255 - 54) * p / 100, 241 + (59 - 241) * p / 100, 163 + (107 - 163) * p / 100].map(Math.round).join(',')})`; // green→red
 
 function updateEuBox() {
-  let hops = 0, hopsNonEu = 0;
+  let hops = 0, hopsNonEu = 0, destCc = '', destIdx = -1;
   const asCc = new Map(); // asn -> first seen country
   for (const track of MtrMap.tracks.values()) {
     for (const h of (track.hops || [])) {
@@ -631,8 +632,13 @@ function updateEuBox() {
       if (!cc) continue;
       hops++; if (!EU_CC.has(cc)) hopsNonEu++;
       if (g.asn && !asCc.has(g.asn)) asCc.set(g.asn, cc);
+      if (h.idx > destIdx) { destIdx = h.idx; destCc = cc; } // furthest hop = destination
     }
   }
+  // destination sovereignty: a non-EU endpoint is a 100% non-sovereign destination
+  if (!destCc) { euEls.dest.textContent = ''; }
+  else if (EU_CC.has(destCc)) { euEls.dest.innerHTML = `<span class="eu-ok">${ccFlag(destCc)} EU destination — sovereign</span>`; }
+  else { euEls.dest.innerHTML = `<span class="eu-bad">${ccFlag(destCc)} 100% non-sovereign destination</span>`; }
   const nets = [...asCc.values()];
   const netsNonEu = nets.filter((cc) => !EU_CC.has(cc)).length;
   const hp = hops ? Math.round((100 * hopsNonEu) / hops) : null;

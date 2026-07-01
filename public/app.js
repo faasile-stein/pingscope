@@ -557,6 +557,9 @@ function openMtr(ip) {
   stageMeta.textContent = 'starting…';
   mtrStage.classList.remove('hidden');
   document.body.classList.add('mtr-open');
+  euEls.hops.textContent = euEls.nets.textContent = '—';
+  euEls.hops.style.color = euEls.nets.style.color = '';
+  euEls.note.textContent = 'resolving…';
   MtrMap.open(ip);
   ws.send(JSON.stringify({ type: 'mtr', ip, vantages: [...state.vantages] }));
   mtrGo.disabled = true;
@@ -612,10 +615,42 @@ function updateStageMeta() {
   const n = MtrMap.order.length;
   stageMeta.textContent = `${n} vantage${n !== 1 ? 's' : ''} → ${stageTarget.textContent}`;
 }
+
+// ---- route "sovereignty": share of hops / networks located outside the EU ----
+const EU_CC = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE']);
+const euEls = { hops: document.getElementById('eu-hops'), nets: document.getElementById('eu-nets'), note: document.getElementById('eu-note') };
+const pctColor = (p) => `rgb(${[54 + (255 - 54) * p / 100, 241 + (59 - 241) * p / 100, 163 + (107 - 163) * p / 100].map(Math.round).join(',')})`; // green→red
+
+function updateEuBox() {
+  let hops = 0, hopsNonEu = 0;
+  const asCc = new Map(); // asn -> first seen country
+  for (const track of MtrMap.tracks.values()) {
+    for (const h of (track.hops || [])) {
+      const g = h.geo; if (!g || g.private) continue;
+      const cc = (g.cc || '').toUpperCase();
+      if (!cc) continue;
+      hops++; if (!EU_CC.has(cc)) hopsNonEu++;
+      if (g.asn && !asCc.has(g.asn)) asCc.set(g.asn, cc);
+    }
+  }
+  const nets = [...asCc.values()];
+  const netsNonEu = nets.filter((cc) => !EU_CC.has(cc)).length;
+  const hp = hops ? Math.round((100 * hopsNonEu) / hops) : null;
+  const np = nets.length ? Math.round((100 * netsNonEu) / nets.length) : null;
+  const set = (el, p, n, d) => {
+    el.textContent = p == null ? '—' : `${p}%`;
+    el.style.color = p == null ? '' : pctColor(p);
+    el.title = p == null ? '' : `${n} of ${d} outside the EU`;
+  };
+  set(euEls.hops, hp, hopsNonEu, hops);
+  set(euEls.nets, np, netsNonEu, nets.length);
+  euEls.note.textContent = hops ? `${hops} located hops · ${nets.length} networks` : 'resolving…';
+}
+
 function handleMtr(msg) {
   const source = msg.source || 'local';
   const meta = trackMeta(source, msg.agent);
   if (msg.start) { MtrMap.ensureTrack(source, meta); updateStageMeta(); return; }
-  if (msg.hops) { MtrMap.setHops(source, msg.hops, meta); updateStageMeta(); }
+  if (msg.hops) { MtrMap.setHops(source, msg.hops, meta); updateStageMeta(); updateEuBox(); }
   if (msg.error) { MtrMap.setTrackError(source, msg.error, meta); }
 }

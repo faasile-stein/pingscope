@@ -374,6 +374,21 @@ body.mtr-open #timemachine { opacity: 0; pointer-events: none; transition: opaci
   white-space: nowrap;
 }
 .mtr-tip.hidden { display: none; }
+
+/* MTR "route sovereignty" box — non-EU hop / network share */
+.eu-box {
+  position: absolute; top: 54px; left: 16px; z-index: 3; pointer-events: none;
+  min-width: 156px; padding: 9px 12px; border-radius: 12px;
+  background: rgba(9, 12, 22, 0.78); border: 1px solid rgba(120, 150, 220, 0.18);
+  backdrop-filter: blur(6px); font: 500 11.5px/1.5 ui-monospace, Menlo, monospace; color: var(--muted);
+}
+.eu-title { color: #cdd7f5; font-weight: 600; margin-bottom: 4px; }
+.eu-row { display: flex; justify-content: space-between; gap: 14px; }
+.eu-row b { font-weight: 700; }
+.eu-note { margin-top: 5px; font-size: 10px; color: var(--muted); opacity: .8; }
+@media (max-width: 720px) {
+  .eu-box { top: 46px; left: 8px; padding: 7px 10px; min-width: 132px; font-size: 10.5px; }
+}
 .mtr-tip .tip-head { display: flex; justify-content: space-between; gap: 16px; font-weight: 700; margin-bottom: 4px; }
 .mtr-tip .tip-rt { color: var(--c, var(--accent)); }
 .mtr-tip .tip-name { color: var(--txt); }

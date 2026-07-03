@@ -116,7 +116,8 @@ body::after {
   top: 76px; left: 22px;
   z-index: 4;
   width: 290px;
-  max-height: calc(100vh - 150px);
+  /* 76px top offset + 140px clearance for the HUD rows at the bottom */
+  max-height: calc(100vh - 216px);
   display: flex;
   flex-direction: column;
   background: var(--panel);
@@ -582,10 +583,26 @@ body.graph-all #graph-note { display: none; }
   border: 1px solid rgba(74, 216, 255, 0.28);
 }
 .appfooter a:hover { background: rgba(74, 216, 255, 0.2); }
+.appfooter .foot-sep { width: 1px; height: 14px; background: rgba(120, 140, 200, 0.25); flex: none; }
+.appfooter .foot-credit a {
+  background: none; border: none; padding: 0; border-radius: 0;
+  font: inherit; font-weight: 600; color: #cdd7f5;
+}
+.appfooter .foot-credit a:hover { color: var(--accent); background: none; }
 body.mtr-open .appfooter { opacity: 0; pointer-events: none; }
+/* narrower windows: drop the blurb so the footer clears the HUD + MTR panels */
+@media (max-width: 1600px) {
+  .appfooter > span:first-child, .appfooter .foot-sep { display: none; }
+}
 @media (max-width: 720px) {
-  .appfooter { font-size: 10px; padding: 5px 10px; gap: 7px; bottom: 8px; max-width: 94vw; }
+  .appfooter {
+    font-size: 9.5px; padding: 4px 10px; gap: 6px; bottom: 8px;
+    width: max-content; max-width: 96vw;   /* left:50% caps shrink-to-fit at half the viewport */
+    flex-wrap: wrap; justify-content: center; border-radius: 999px;
+  }
+  .appfooter a { font-size: 10px; padding: 2px 7px; }
   .appfooter span { overflow: hidden; text-overflow: ellipsis; }
+  .appfooter .fc-long { display: none; }  /* shorter credit keeps it on one line */
 }
 
 /* in globe view, hide the graph-only controls */

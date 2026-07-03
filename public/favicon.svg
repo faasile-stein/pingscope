@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- the ◵ brand mark: cyan scope circle, lower-left quadrant filled -->
+  <rect width="64" height="64" rx="14" fill="#05060c"/>
+  <g filter="url(#glow)">
+    <circle cx="32" cy="32" r="19" fill="none" stroke="#4ad8ff" stroke-width="4.5"/>
+    <path d="M32 32 L32 51 A19 19 0 0 1 13 32 Z" fill="#4ad8ff"/>
+  </g>
+  <defs>
+    <filter id="glow" x="-40%" y="-40%" width="180%" height="180%">
+      <feGaussianBlur stdDeviation="1.6" result="b"/>
+      <feMerge>
+        <feMergeNode in="b"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+</svg>

@@ -459,8 +459,8 @@ body.mtr-open #timemachine { opacity: 0; pointer-events: none; transition: opaci
 
   #hud { display: none; }
 
-  /* MTR launcher: full-width bottom bar */
-  #mtrpanel { left: 10px; right: 10px; bottom: 10px; }
+  /* MTR launcher: full-width bottom bar, lifted to clear the footer pill below it */
+  #mtrpanel { left: 10px; right: 10px; bottom: 44px; }
   #mtrpanel .mtr-head { width: 100%; }
   #mtr-form { flex: 1; }
   #mtr-ip { flex: 1; width: auto; }
@@ -613,6 +613,8 @@ body.mtr-open .globe-canvas, body.mtr-open .globe-labels, body.mtr-open .globe-h
 @media (max-width: 720px) {
   .viewswitch { padding: 3px; }
   .vbtn { padding: 6px 9px; font-size: 11px; }
-  .globe-hud { left: 12px; bottom: 84px; font-size: 10.5px; padding: 9px 11px; }
+  /* legend to the free top-left (time machine is hidden in globe view) so it
+     doesn't hide behind the lifted MTR panel */
+  .globe-hud { left: 12px; top: 58px; bottom: auto; font-size: 10.5px; padding: 9px 11px; }
   .globe-label .gl-name { display: none; }
 }

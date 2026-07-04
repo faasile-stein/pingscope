@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sovereignty ranking · PingScope</title>
+  <meta name="description" content="Every domain checked with the European sovereignty check, ranked by how sovereign its web and mail hosting is." />
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="PingScope" />
+  <meta property="og:title" content="European sovereignty ranking" />
+  <meta property="og:description" content="Domains ranked by how sovereign their web & mail hosting is. Check yours — most of the European web scores lower than you'd think." />
+  <meta property="og:url" content="https://pingscope.net/ranking" />
+  <meta property="og:image" content="https://pingscope.net/og-sovereignty.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:image" content="https://pingscope.net/og-sovereignty.png" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.ico" sizes="32x32" />
+  <style>
+    :root {
+      --bg: #06070e; --surface: #0d1120; --line: rgba(126,144,194,0.14); --line-2: rgba(126,144,194,0.26);
+      --txt: #e9edfb; --muted: #8b95b8; --faint: #626c94; --accent: #4ad8ff; --accent-ink: #041019;
+      --good: #35e0a1; --bad: #ff6272; --warn: #ffb44d;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+      --sans: ui-sans-serif, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--txt); font-family: var(--sans); line-height: 1.6; font-size: 16px; -webkit-font-smoothing: antialiased; }
+    .wrap { max-width: 820px; margin: 0 auto; padding: 0 24px 90px; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+
+    .top { display: flex; align-items: center; justify-content: space-between; padding: 22px 0; border-bottom: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 11px; color: var(--txt); }
+    .brand:hover { text-decoration: none; }
+    .brand .logo { font-size: 24px; color: var(--accent); filter: drop-shadow(0 0 9px rgba(74,216,255,0.55)); }
+    .brand b { font: 700 15px/1 var(--sans); letter-spacing: 4px; }
+    .nav { display: flex; gap: 8px; }
+    .nav a { font: 500 12px/1 var(--mono); color: var(--muted); border: 1px solid var(--line-2); border-radius: 999px; padding: 7px 13px; }
+    .nav a:hover { color: var(--accent); border-color: var(--accent); text-decoration: none; }
+
+    .hero { padding: 46px 0 26px; }
+    .kicker { font: 600 12px/1 var(--mono); letter-spacing: .22em; text-transform: uppercase; color: var(--faint); }
+    .kicker::before { content: "— "; color: var(--accent); }
+    h1 { font: 800 clamp(30px,5vw,42px)/1.08 var(--sans); letter-spacing: -0.02em; margin: 14px 0 0; text-wrap: balance; }
+    .lede { font-size: 17px; color: #c6cfec; max-width: 60ch; margin: 14px 0 0; }
+    .lede a { font-weight: 600; }
+
+    .meta { display: flex; align-items: baseline; gap: 10px; margin: 26px 0 10px; font: 500 12px/1 var(--mono); color: var(--faint); }
+
+    table { width: 100%; border-collapse: collapse; font-family: var(--mono); }
+    thead th { font: 600 11px/1 var(--mono); letter-spacing: .1em; text-transform: uppercase; color: var(--faint); text-align: right; padding: 0 0 12px; border-bottom: 1px solid var(--line-2); }
+    thead th.l { text-align: left; }
+    tbody td { padding: 13px 0; border-bottom: 1px solid var(--line); text-align: right; font-variant-numeric: tabular-nums; }
+    tbody tr:hover { background: rgba(74,216,255,0.035); }
+    td.rank { color: var(--faint); font-size: 13px; width: 46px; text-align: left; }
+    td.dom { text-align: left; }
+    td.dom a { color: var(--txt); font-weight: 600; }
+    td.dom a:hover { color: var(--accent); }
+    .sc { font-weight: 700; font-variant-numeric: tabular-nums; }
+    .sc.dash { color: var(--faint); font-weight: 500; }
+    td.when { color: var(--faint); font-size: 12px; width: 92px; }
+    td.go { width: 34px; }
+    td.go a { color: var(--faint); }
+    td.go a:hover { color: var(--accent); }
+    .state { padding: 40px 0; text-align: center; font: 500 14px/1.6 var(--mono); color: var(--muted); }
+    .state a { font-weight: 600; }
+
+    .foot { margin-top: 42px; padding-top: 22px; border-top: 1px solid var(--line); font: 500 12.5px/1.7 var(--mono); color: var(--faint); }
+    .foot a { color: var(--muted); } .foot a:hover { color: var(--accent); }
+    @media (max-width: 560px) {
+      td.when, th.when { display: none; }
+      .brand b { letter-spacing: 2px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/"><span class="logo">◵</span><b>PINGSCOPE</b></a>
+      <nav class="nav">
+        <a href="/sovereignty">check a domain</a>
+        <a href="/">live observatory →</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="kicker">European sovereignty · leaderboard</div>
+      <h1>Who's actually European?</h1>
+      <p class="lede">Every domain run through the <a href="/sovereignty">sovereignty check</a>, ranked by how sovereign its web &amp; mail hosting is. Higher is better. <a href="/sovereignty">Check yours →</a></p>
+    </section>
+
+    <div class="meta"><span id="rank-count">loading…</span></div>
+    <table>
+      <thead>
+        <tr>
+          <th class="l" style="width:46px">#</th>
+          <th class="l">Domain</th>
+          <th>Web</th>
+          <th>Mail</th>
+          <th class="when">Tested</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody id="rank-body"></tbody>
+    </table>
+    <div id="rank-state"></div>
+
+    <footer class="foot">
+      Ranked by the average of the web &amp; mail sovereignty scores (a domain with no mail is ranked on web alone). Estimated, debatable, open source.<br>
+      <a href="/sovereignty">the sovereignty check →</a> · <a href="/">live observatory →</a> · <a href="https://github.com/faasile-stein/pingscope">GitHub →</a>
+    </footer>
+  </div>
+  <script src="./ranking.js"></script>
+</body>
+</html>

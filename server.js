@@ -276,6 +276,24 @@ const recentStmt = db.prepare(
   'SELECT * FROM samples WHERE target_id = ? AND t >= ? ORDER BY t ASC'
 );
 
+// Persisted sovereignty scans → power the /ranking leaderboard and survive
+// restarts (also re-seed the in-memory result cache on boot).
+db.exec(`
+  CREATE TABLE IF NOT EXISTS sov_scores (
+    domain TEXT PRIMARY KEY,
+    web    INTEGER,
+    mail   INTEGER,
+    data   TEXT NOT NULL,
+    at     INTEGER NOT NULL
+  );
+`);
+const sovUpsertStmt = db.prepare(`
+  INSERT INTO sov_scores (domain, web, mail, data, at) VALUES ($domain, $web, $mail, $data, $at)
+  ON CONFLICT(domain) DO UPDATE SET web=$web, mail=$mail, data=$data, at=$at
+`);
+const sovSeedStmt = db.prepare('SELECT domain, data, at FROM sov_scores');
+const sovRankStmt = db.prepare('SELECT domain, web, mail, at FROM sov_scores');
+
 function persist(r) {
   insertStmt.run(r.targetId, r.t, r.loss, r.sent, r.recv, r.min, r.max, r.median, r.p25, r.p75, r.avg);
 }
@@ -426,9 +444,9 @@ const SOV_HTML = fs.readFileSync(path.join(__dirname, 'public', 'sovereignty.htm
 const SOV_FONT = { fontDirs: ['/usr/share/fonts'], loadSystemFonts: true, defaultFontFamily: 'DejaVu Sans' };
 const clampScore = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null; };
 const sovScoreColor = (s) => {
-  if (s == null) return '#8f9bc4';
-  const p = (100 - s) / 100;
-  return `rgb(${[54 + (255 - 54) * p, 241 + (93 - 241) * p, 163 + (108 - 163) * p].map(Math.round).join(',')})`;
+  if (s == null) return '#8b95b8';
+  const p = (100 - s) / 100; // sovereign green #35e0a1 → non-sovereign red #ff6272
+  return `rgb(${[53 + (255 - 53) * p, 224 + (98 - 224) * p, 161 + (114 - 161) * p].map(Math.round).join(',')})`;
 };
 const sovVerdict = (s) => (s == null ? 'no mail' : s >= 80 ? 'sovereign' : s >= 50 ? 'partial' : 'non-sovereign');
 
@@ -442,28 +460,23 @@ function sovOgSvg({ domain, web, mail }) {
   const tile = (x, label, score) => {
     const col = sovScoreColor(score), v = sovVerdict(score);
     return `
-    <text x="${x + 26}" y="474" font-family="${M}" font-size="15" letter-spacing="2" fill="#8f9bc4">${label}</text>
-    <text x="${x + 24}" y="536" font-family="${M}" font-size="60" font-weight="bold" fill="${col}">${score == null ? '—' : score}<tspan font-size="19" fill="#8f9bc4"> /100</tspan></text>
+    <text x="${x + 26}" y="474" font-family="${M}" font-size="15" letter-spacing="2" fill="#8b95b8">${label}</text>
+    <text x="${x + 24}" y="536" font-family="${M}" font-size="60" font-weight="bold" fill="${col}">${score == null ? '—' : score}<tspan font-size="19" fill="#626c94"> /100</tspan></text>
     <rect x="${x + 25}" y="552" width="${(v.length * 8.6) + 22}" height="27" rx="13.5" fill="none" stroke="${col}"/>
     <text x="${x + 36}" y="570" font-family="${M}" font-size="14" fill="${col}">${v}</text>`;
   };
   return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <defs>
-    <radialGradient id="g1" cx="12%" cy="-10%" r="70%"><stop offset="0" stop-color="#4ad8ff" stop-opacity="0.18"/><stop offset="1" stop-color="#4ad8ff" stop-opacity="0"/></radialGradient>
-    <radialGradient id="g2" cx="110%" cy="120%" r="80%"><stop offset="0" stop-color="#b78bff" stop-opacity="0.22"/><stop offset="1" stop-color="#b78bff" stop-opacity="0"/></radialGradient>
-    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4ad8ff"/><stop offset="1" stop-color="#b78bff"/></linearGradient>
-  </defs>
-  <rect width="1200" height="630" fill="#05060c"/>
-  <rect width="1200" height="630" fill="url(#g1)"/><rect width="1200" height="630" fill="url(#g2)"/>
+  <rect width="1200" height="630" fill="#06070e"/>
+  <line x1="64" y1="106" x2="1136" y2="106" stroke="#1a2138"/>
   <g transform="translate(64,52)"><circle cx="17" cy="17" r="15" fill="none" stroke="#4ad8ff" stroke-width="3.5"/><path d="M17 17 L17 32 A15 15 0 0 1 2 17 Z" fill="#4ad8ff"/></g>
-  <text x="112" y="78" font-family="${F}" font-size="22" font-weight="bold" letter-spacing="6" fill="#e7ecff">PINGSCOPE</text>
-  <rect x="905" y="52" width="231" height="38" rx="19" fill="rgba(183,139,255,0.08)" stroke="#b78bff" stroke-opacity="0.4"/>
-  <text x="932" y="77" font-family="${M}" font-size="17" fill="#b78bff">sovereignty check</text>
-  <text x="64" y="248" font-family="${M}" font-size="20" letter-spacing="5" fill="#8f9bc4">EUROPEAN SOVEREIGNTY CHECK OF</text>
-  <text x="62" y="324" font-family="${F}" font-size="${dSize}" font-weight="800" fill="url(#grad)">${d}</text>
-  <text x="64" y="404" font-family="${F}" font-size="25" fill="#c3ccea">Where its web &amp; mail are hosted — and who controls them.</text>
-  <rect x="662" y="430" width="474" height="164" rx="20" fill="rgba(12,16,30,0.82)" stroke="rgba(120,150,220,0.24)"/>
-  <line x1="899" y1="452" x2="899" y2="572" stroke="rgba(120,150,220,0.18)"/>
+  <text x="112" y="78" font-family="${F}" font-size="22" font-weight="bold" letter-spacing="6" fill="#e9edfb">PINGSCOPE</text>
+  <rect x="905" y="52" width="231" height="38" rx="19" fill="none" stroke="#4ad8ff" stroke-opacity="0.4"/>
+  <text x="932" y="77" font-family="${M}" font-size="17" fill="#4ad8ff">sovereignty check</text>
+  <text x="64" y="252" font-family="${M}" font-size="20" letter-spacing="5" fill="#626c94">EUROPEAN SOVEREIGNTY CHECK OF</text>
+  <text x="62" y="328" font-family="${F}" font-size="${dSize}" font-weight="800" fill="#4ad8ff">${d}</text>
+  <text x="64" y="406" font-family="${F}" font-size="25" fill="#c1cae8">Where its web &amp; mail are hosted — and who controls them.</text>
+  <rect x="662" y="430" width="474" height="164" rx="20" fill="#0d1120" stroke="#232c48"/>
+  <line x1="899" y1="454" x2="899" y2="570" stroke="#232c48"/>
   ${tile(662, 'WEB', web)}${tile(899, 'MAIL', mail)}
   <text x="64" y="560" font-family="${M}" font-size="23" font-weight="bold" fill="#4ad8ff">pingscope.net/sovereignty</text>
 </svg>`;
@@ -509,6 +522,21 @@ app.get('/sovereignty', (req, res) => {
   res.type('html').send(SOV_HTML.replace('<!--SOVOG-->', tags));
 });
 
+// Leaderboard of every domain that's been checked, ranked by sovereignty.
+app.get('/ranking', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.type('html').sendFile(path.join(__dirname, 'public', 'ranking.html'));
+});
+app.get('/api/rankings', (req, res) => {
+  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 300));
+  const rows = sovRankStmt.all()
+    .map((r) => ({ domain: r.domain, web: r.web, mail: r.mail, at: r.at,
+      composite: r.mail == null ? r.web : (r.web == null ? r.mail : Math.round((r.web + r.mail) / 2)) }))
+    .sort((a, b) => (b.composite ?? -1) - (a.composite ?? -1) || b.at - a.at)
+    .slice(0, limit);
+  res.json({ count: rows.length, rankings: rows });
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 // Full probe catalog + the default-visualised set.
 app.get('/api/probes', (_req, res) => res.json({ probes: PROBES, preselected: PRESELECTED }));
@@ -518,11 +546,26 @@ app.get('/api/targets', (_req, res) => res.json(PROBES)); // back-compat
 // endpoints and score how EU-sovereign the hosting + route is.
 app.get('/api/sovereignty', async (req, res) => {
   const host = parseSiteHost(req.query.url || req.query.domain);
-  if (!host) return res.status(400).json({ error: 'enter a valid domain or URL' });
+  if (!host) return res.status(400).json({ error: 'enter a domain, e.g. example.com' });
   logQuery('sov', host, clientIp(req));
+
+  // Cache: once a domain has been scored, serve that result instantly. Only a
+  // ?fresh=1 "retest" re-traces (and only that path consumes the rate limit).
+  const fresh = req.query.fresh === '1' || req.query.fresh === 'true';
+  const cached = sovCache.get(host);
+  const fresh_ok = cached && Date.now() - cached.at < SOV_TTL_MS;
+  if (!fresh && fresh_ok) return res.json({ ...cached.data, cached: true, at: cached.at });
+
   const wait = rateLimit(clientIp(req));
-  if (wait) return res.status(429).set('Retry-After', String(wait)).json({ error: `rate limited — one check per ${RATE_MS / 1000}s (try again in ${wait}s)` });
-  if (SOV.inflight >= SOV.maxInflight) return res.status(429).json({ error: 'busy — try again shortly' });
+  if (wait) {
+    // rate-limited but we have a prior result → serve it rather than erroring
+    if (cached) return res.json({ ...cached.data, cached: true, at: cached.at, rateLimited: true });
+    return res.status(429).set('Retry-After', String(wait)).json({ error: `rate limited — one check per ${RATE_MS / 1000}s (try again in ${wait}s)` });
+  }
+  if (SOV.inflight >= SOV.maxInflight) {
+    if (cached) return res.json({ ...cached.data, cached: true, at: cached.at });
+    return res.status(429).json({ error: 'busy — try again shortly' });
+  }
   SOV.inflight++;
   try {
     const t = await resolveWebMail(host);
@@ -536,7 +579,9 @@ app.get('/api/sovereignty', async (req, res) => {
     ]);
     const web = scoreCategory(serversWithGeo(t.web), webHops);
     const mail = scoreCategory(serversWithGeo(t.mail), mailHops);
-    res.json({ domain: host, mailDomain: t.mailDomain, web, mail });
+    const data = { domain: host, mailDomain: t.mailDomain, web, mail };
+    const at = persistSov(data);
+    res.json({ ...data, cached: false, at });
   } catch {
     res.status(500).json({ error: 'scan failed' });
   } finally {
@@ -1027,6 +1072,31 @@ const EU_CC = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR
 const SOVEREIGN_CC = new Set([...EU_CC, 'CH', 'GB', 'IS']);
 
 const SOV = { perCat: 3, inflight: 0, maxInflight: 4 }; // caps to bound fan-out / abuse
+const SOV_TTL_MS = Number(process.env.SOV_TTL_MS || 6 * 3600 * 1000); // cache a score for 6h
+const sovCache = new Map(); // domain -> { data, at }
+
+// Persist a completed scan: in-memory cache (fast serve) + SQLite (durable,
+// powers the ranking and survives restarts). Returns the timestamp.
+function persistSov(result) {
+  const at = Date.now();
+  const web = result.web && result.web.score != null ? result.web.score : null;
+  const mail = result.mail && result.mail.score != null ? result.mail.score : null;
+  sovCache.set(result.domain, { data: result, at });
+  if (sovCache.size > 2000) for (const [k, v] of sovCache) if (at - v.at > SOV_TTL_MS) sovCache.delete(k);
+  try { sovUpsertStmt.run({ domain: result.domain, web, mail, data: JSON.stringify(result), at }); } catch { /* best-effort */ }
+  return at;
+}
+
+// Re-seed the in-memory cache from the DB at startup so scores survive restarts.
+function seedSovCache() {
+  try {
+    let n = 0;
+    for (const row of sovSeedStmt.all()) {
+      try { sovCache.set(row.domain, { data: JSON.parse(row.data), at: row.at }); n++; } catch { /* skip */ }
+    }
+    console.log(`  sovereignty: ${n} cached score(s) loaded from disk`);
+  } catch (e) { console.warn('  sovereignty: cache seed failed —', e.message); }
+}
 
 // One bounded traceroute (no live loop). Returns located hops with geo.
 // No sub-second -i: mtr refuses interval < 1s for non-root users.
@@ -1056,17 +1126,23 @@ function traceOnce(ip, { cycles = 3, maxHops = 30, timeoutMs = 12000 } = {}) {
   });
 }
 
-// A URL or bare domain → hostname (scheme/path/port/brackets stripped).
+// A registrable domain: ≥2 dot-separated labels ending in a real TLD (or a
+// punycode xn-- TLD). Deliberately excludes bare IPs and single-label hosts —
+// the sovereignty check is a domain tool.
+const DOMAIN_RE = /^(?=.{4,253}$)([a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+([a-z]{2,63}|xn--[a-z0-9]{2,59})$/;
+
+// A URL or bare domain → the domain (scheme/path/port/www stripped). Returns
+// null for anything that isn't a valid domain (IPs included).
 function parseSiteHost(input) {
   let s = String(input || '').trim();
   if (!s) return null;
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) { try { s = new URL(s).hostname; } catch { return null; } }
   else s = s.split(/[/?#]/)[0];
-  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1); // [v6]
+  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1); // [v6] → rejected below
   else s = s.replace(/:\d+$/, '');                              // host:port
   s = s.toLowerCase();
-  if (net.isIP(s)) return s;                                    // a bare IP (web only)
-  return isValidHost(s) ? s : null;
+  if (net.isIP(s)) return null;                                 // domains only, not bare IPs
+  return DOMAIN_RE.test(s) ? s : null;
 }
 
 // Common two-label public suffixes — for these the registrable domain is the
@@ -1226,7 +1302,7 @@ function traceStream(ip, onUpdate, { cycles = 3, maxHops = 30, timeoutMs = 15000
 async function startSovScan(ws, session, rawUrl) {
   const sendMsg = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'sov', ...o })); };
   const host = parseSiteHost(rawUrl);
-  if (!host) return sendMsg({ phase: 'error', error: 'enter a valid domain or URL' });
+  if (!host) return sendMsg({ phase: 'error', error: 'enter a domain, e.g. example.com' });
   logQuery('sov', host, session.ip);
   const wait = rateLimit(session.ip);
   if (wait) return sendMsg({ phase: 'error', error: `rate limited — one trace/check per ${RATE_MS / 1000}s (try again in ${wait}s)` });
@@ -1243,11 +1319,10 @@ async function startSovScan(ws, session, rawUrl) {
       t.web[0] ? traceStream(t.web[0].ip, (hops) => sendMsg({ phase: 'trace', cat: 'web', hops })) : Promise.resolve([]),
       t.mail[0] ? traceStream(t.mail[0].ip, (hops) => sendMsg({ phase: 'trace', cat: 'mail', hops })) : Promise.resolve([]),
     ]);
-    sendMsg({
-      phase: 'done', domain: host, mailDomain: t.mailDomain,
-      web: t.web.length ? scoreCategory(webServers, webHops) : null,
-      mail: t.mail.length ? scoreCategory(mailServers, mailHops) : null,
-    });
+    const web = t.web.length ? scoreCategory(webServers, webHops) : null;
+    const mail = t.mail.length ? scoreCategory(mailServers, mailHops) : null;
+    persistSov({ domain: host, mailDomain: t.mailDomain, web, mail });
+    sendMsg({ phase: 'done', domain: host, mailDomain: t.mailDomain, web, mail });
   } catch {
     sendMsg({ phase: 'error', error: 'scan failed' });
   } finally {
@@ -1265,6 +1340,7 @@ async function main() {
   PRESELECTED = computePreselected();
   ORIGIN = computeOrigin();
   seedHistory();
+  seedSovCache();
   loop();
   server.listen(PORT, () => {
     console.log(`\n  PingScope running →  http://localhost:${PORT}\n`);

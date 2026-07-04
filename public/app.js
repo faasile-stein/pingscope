@@ -702,21 +702,25 @@ function sovCategoryHtml(title, icon, key, cat, emptyMsg) {
   }
   const s = cat.done ? cat.score : null, color = sovColor(cat.done ? s : null);
   const primaryIp = (cat.servers && cat.servers[0] && cat.servers[0].ip) || '';
-  const servers = (cat.servers || []).map((sv) =>
-    `<button type="button" class="sov-srv" data-ip="${esc(sv.ip)}" title="open full MTR → ${esc(sv.ip)}">` +
-    `<div class="sov-srv-top"><span class="sov-flag">${ccFlag(sv.cc)}</span>` +
-    `<span class="sov-srv-ip">${esc(sv.exchange || sv.ip)}</span><span class="sov-srv-go">MTR ↗</span></div>` +
-    `<div class="sov-srv-sub">` +
-    `<span class="sov-srv-geo">${esc([sv.city, sv.country].filter(Boolean).join(', ') || 'location unknown')}</span>` +
-    `<span class="sov-srv-as ${sv.eu ? 'eu' : 'non'}">${esc(sv.asName || sv.as || '')}</span>` +
-    `</div></button>`).join('') || `<div class="sov-empty">no servers resolved</div>`;
+  const servers = (cat.servers || []).map((sv) => {
+    const ownerFlag = sv.ownerCc ? ccFlag(sv.ownerCc) : '';
+    const half = sv.eu && !sv.euOwned;   // EU-hosted but owned outside the EU → halved
+    const asTitle = sv.euOwned ? '' : `owned by ${esc(sv.ownerParent || sv.asName || 'a non-EU company')} (${esc(sv.ownerCc || '?')}) — outside the EU, hosting score halved`;
+    return `<button type="button" class="sov-srv" data-ip="${esc(sv.ip)}" title="open full MTR → ${esc(sv.ip)}">` +
+      `<div class="sov-srv-top"><span class="sov-flag">${ccFlag(sv.cc)}</span>` +
+      `<span class="sov-srv-ip">${esc(sv.exchange || sv.ip)}</span><span class="sov-srv-go">MTR ↗</span></div>` +
+      `<div class="sov-srv-sub">` +
+      `<span class="sov-srv-geo">${esc([sv.city, sv.country].filter(Boolean).join(', ') || 'location unknown')}</span>` +
+      `<span class="sov-srv-as ${sv.euOwned ? 'eu' : 'non'}"${asTitle ? ` title="${asTitle}"` : ''}>${ownerFlag} ${esc(sv.asName || sv.as || '')}${half ? ' <b class="sov-half">½</b>' : ''}</span>` +
+      `</div></button>`;
+  }).join('') || `<div class="sov-empty">no servers resolved</div>`;
   const scoreBlock = cat.done
     ? `<div class="sov-score" style="color:${color}">${s == null ? '—' : s}<span class="sov-score-max">/100</span></div>
        <div class="sov-badge2" style="color:${color};border-color:${color}">${sovLabel(s)}</div>`
     : `<div class="sov-scoring">tracing route…</div>`;
   const transit = cat.done
     ? (cat.transit
-        ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks outside EU`
+        ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks non-sovereign`
         : `<span class="sov-dim">route not measured (target blocks traceroute)</span>`)
     : '';
   return `<div class="sov-cat" data-cat="${key}">

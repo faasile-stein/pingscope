@@ -658,6 +658,7 @@ function resolveNames(ips) {
 // calls). City DB → country/city/coords, ASN DB → AS number + organisation.
 let cityReader = null, asnReader = null;
 const asnNames = new Map(); // ASN -> registered AS name (the org running the AS)
+const asnCC = new Map();    // ASN -> RIR registration country (a proxy for owner)
 const GEO_DIR = process.env.GEO_DIR || path.join(__dirname, 'geo');
 async function loadGeo() {
   try { cityReader = await maxmind.open(path.join(GEO_DIR, 'dbip-city.mmdb')); console.log('  geo: city DB loaded'); }
@@ -682,7 +683,8 @@ function loadAsnNames() {
       if (i1 < 0 || i2 < 0 || iLast <= i2) continue;
       const asn = Number(line.slice(0, i1));
       const desc = line.slice(i2 + 1, iLast).replace(/^"|"$/g, '').trim();
-      if (asn && desc) { asnNames.set(asn, desc); n++; }
+      const cc = line.slice(iLast + 1).trim().toUpperCase();
+      if (asn && desc) { asnNames.set(asn, desc); if (cc.length === 2) asnCC.set(asn, cc); n++; }
     }
     console.log(`  geo: ${n} AS names loaded`);
   } catch (e) {
@@ -692,6 +694,36 @@ function loadAsnNames() {
 
 function asnOrg(asn, fallback) {
   return (asn && asnNames.get(asn)) || fallback || '';
+}
+
+// Ultimate corporate owner outside the EU. Matched by AS org NAME (not just the
+// registration country) because multinationals register EU-subsidiary ASNs
+// inside the EU — e.g. "Amazon Data Services Ireland" (IE) is still US-owned,
+// and Belgian "Telenet BV" (BE) is owned by US-listed Liberty Global. A server
+// hosted in the EU but owned by such a company is only half-sovereign (subject
+// to foreign jurisdiction like the US CLOUD Act). Unlisted orgs fall back to
+// the AS registration country.
+const NON_EU_OWNERS = [
+  { re: /\bgoogle\b/i, cc: 'US' }, { re: /\bmicrosoft\b/i, cc: 'US' }, { re: /\bgithub\b/i, cc: 'US' },
+  { re: /\bamazon\b|\baws\b/i, cc: 'US' }, { re: /\bmeta\b|\bfacebook\b/i, cc: 'US' }, { re: /\bapple\b/i, cc: 'US' },
+  { re: /\bcloudflare\b/i, cc: 'US' }, { re: /\bakamai\b/i, cc: 'US' }, { re: /\bfastly\b/i, cc: 'US' },
+  { re: /\boracle\b/i, cc: 'US' }, { re: /\bibm\b/i, cc: 'US' }, { re: /\bdigitalocean\b/i, cc: 'US' },
+  { re: /\blinode\b/i, cc: 'US' }, { re: /\bvultr\b|\bchoopa\b/i, cc: 'US' }, { re: /\bsalesforce\b/i, cc: 'US' },
+  { re: /\btelenet\b/i, cc: 'US', parent: 'Liberty Global', onlyReg: ['BE'] },
+  { re: /liberty\s*global/i, cc: 'US', parent: 'Liberty Global' },
+];
+
+// Determine the effective owner country of an AS (and a parent label if the
+// registration country hides the ultimate owner).
+function ownerOf(asn, org, physicalCc) {
+  const regCc = asnCC.get(asn) || '';
+  for (const o of NON_EU_OWNERS) {
+    if (o.re.test(org || '') && (!o.onlyReg || o.onlyReg.includes(regCc))) {
+      return { cc: o.cc, parent: o.parent || null, euOwned: SOVEREIGN_CC.has(o.cc) };
+    }
+  }
+  const cc = regCc || physicalCc || '';
+  return { cc, parent: null, euOwned: !!cc && SOVEREIGN_CC.has(cc) };
 }
 
 function geoLookup(ip) {
@@ -858,6 +890,8 @@ function startMtr(ws, ip, session, source = 'local') {
 
 // EU-27 (matches the client-side route-sovereignty box).
 const EU_CC = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR', 'DE', 'GR', 'HU', 'IE', 'IT', 'LV', 'LT', 'LU', 'MT', 'NL', 'PL', 'PT', 'RO', 'SK', 'SI', 'ES', 'SE']);
+// Sovereignty set = EU-27 + Switzerland, UK and Iceland (EU adequacy / EEA ties).
+const SOVEREIGN_CC = new Set([...EU_CC, 'CH', 'GB', 'IS']);
 
 const SOV = { perCat: 3, inflight: 0, maxInflight: 4 }; // caps to bound fan-out / abuse
 
@@ -932,35 +966,42 @@ async function resolveWebMail(host) {
   return { host, mailDomain, web, mail };
 }
 
-// Attach geo (country/city/AS + EU flag) to a list of resolved targets.
+// Attach geo + corporate ownership to a list of resolved targets. A server is
+// fully sovereign (sov=1) only when it's BOTH hosted in the EU AND owned by an
+// EU company; EU-hosted but foreign-owned counts half (sov=0.5); non-EU-hosted
+// is sov=0.
 function serversWithGeo(targets) {
   return targets.map((t) => {
     const g = geoLookup(t.ip) || {};
     const cc = (g.cc || '').toUpperCase();
+    const physEu = !!cc && SOVEREIGN_CC.has(cc);
+    const owner = ownerOf(g.asn, g.org, cc);
+    const sov = !physEu ? 0 : (owner.euOwned ? 1 : 0.5);
     return {
       ip: t.ip, exchange: t.exchange || null, priority: t.priority ?? null,
       cc, country: g.country || '', city: g.city || '',
-      as: g.asn ? `AS${g.asn}` : '', asName: g.org || '', eu: !!cc && EU_CC.has(cc),
+      as: g.asn ? `AS${g.asn}` : '', asName: g.org || '',
+      eu: physEu, ownerCc: owner.cc, ownerParent: owner.parent, euOwned: owner.euOwned, sov,
     };
   });
 }
 
 // Score one category (web | mail) from its geo-tagged servers + the traced
-// route to the primary server. Hosting jurisdiction dominates (70%); transit
-// route refines it (30%).
+// route to the primary server. Hosting sovereignty dominates (70%, and is
+// halved for EU-hosted-but-foreign-owned servers); transit route refines it (30%).
 function scoreCategory(servers, hops) {
   const located = servers.filter((s) => s.cc);
-  const serversFrac = located.length ? located.filter((s) => s.eu).length / located.length : null;
+  const serversFrac = located.length ? located.reduce((a, s) => a + s.sov, 0) / located.length : null;
 
   let n = 0, hopsNonEu = 0; const asCc = new Map();
   for (const h of hops || []) {
     const g = h.geo; if (!g || g.private) continue;
     const cc = (g.cc || '').toUpperCase(); if (!cc) continue;
-    n++; if (!EU_CC.has(cc)) hopsNonEu++;
+    n++; if (!SOVEREIGN_CC.has(cc)) hopsNonEu++;
     if (g.asn && !asCc.has(g.asn)) asCc.set(g.asn, cc);
   }
   const nets = [...asCc.values()];
-  const netsNonEu = nets.filter((cc) => !EU_CC.has(cc)).length;
+  const netsNonEu = nets.filter((cc) => !SOVEREIGN_CC.has(cc)).length;
   const hopsNonEuFrac = n ? hopsNonEu / n : null;
   const netsNonEuFrac = nets.length ? netsNonEu / nets.length : null;
 

@@ -354,6 +354,8 @@ body::after {
 .sov-srv-as { margin-left: auto; flex: none; font-size: 10px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sov-srv-as.eu { color: var(--good); }
 .sov-srv-as.non { color: var(--bad); }
+.sov-half { color: var(--orange); font-weight: 700; }
+.sov-note b { color: #cdd7f5; font-weight: 600; }
 .sov-empty { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 6px 0; }
 
 /* live hop stream */

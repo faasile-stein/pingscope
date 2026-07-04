@@ -95,8 +95,10 @@ class Overview {
     const last = vis.length ? vis[vis.length - 1] : null;
 
     // header + footer stats
+    // all interpolated values are numeric; route them through esc() anyway so
+    // nothing reaches innerHTML unsanitised
     cell.now.innerHTML = last
-      ? `<b style="color:rgb(${lossRGB(last.loss).join(',')})">${ms(last.median)}</b>${last.loss > 0 ? ` <i>${Math.round(last.loss * 100)}%</i>` : ''}`
+      ? `<b style="color:rgb(${esc(lossRGB(last.loss).join(','))})">${esc(ms(last.median))}</b>${last.loss > 0 ? ` <i>${esc(Math.round(last.loss * 100))}%</i>` : ''}`
       : '<b>—</b>';
     const med = vis.filter((s) => s.median != null);
     const avg = med.length ? med.reduce((a, s) => a + s.median, 0) / med.length : null;

@@ -542,13 +542,15 @@ MtrMap.onHover = (info) => {
   mtrTip.style.setProperty('--c', lossCss(h.loss || 0));
   mtrTip.style.left = Math.max(120, Math.min(window.innerWidth - 120, info.cx)) + 'px';
   mtrTip.style.top = Math.max(140, info.cy) + 'px';
+  // every interpolated value is passed through esc() before it reaches innerHTML
+  // (rdns/geo strings are attacker/route-influenced; numbers are harmless no-ops)
   mtrTip.innerHTML =
     (info.track && info.track.label ? `<div class="tip-row" style="margin-bottom:3px">${esc(info.track.label)}</div>` : '') +
-    `<div class="tip-head"><span>#${h.idx} · ${fe} ${esc(country)}${esc(city)}</span><span class="tip-rt">${f(h.last)}ms</span></div>` +
+    `<div class="tip-head"><span>#${esc(h.idx)} · ${esc(fe)} ${esc(country)}${esc(city)}</span><span class="tip-rt">${esc(f(h.last))}ms</span></div>` +
     `<div class="tip-name">${esc(name)}</div>` +
     (as ? `<div class="tip-as">${esc(as)}</div>` : '') +
-    `<div class="tip-row">avg <b>${f(h.avg)}ms</b> · loss <b class="${loss > 0 ? 'tip-loss' : ''}">${loss}%</b> · jitter <b>${f(h.stdev)}ms</b></div>` +
-    `<div class="tip-row">best <b>${f(h.best)}</b> · worst <b>${f(h.wrst)}</b> · last <b>${f(h.last)}ms</b></div>`;
+    `<div class="tip-row">avg <b>${esc(f(h.avg))}ms</b> · loss <b class="${loss > 0 ? 'tip-loss' : ''}">${esc(loss)}%</b> · jitter <b>${esc(f(h.stdev))}ms</b></div>` +
+    `<div class="tip-row">best <b>${esc(f(h.best))}</b> · worst <b>${esc(f(h.wrst))}</b> · last <b>${esc(f(h.last))}ms</b></div>`;
   mtrTip.classList.remove('hidden');
 };
 

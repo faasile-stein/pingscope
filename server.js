@@ -11,6 +11,7 @@ const { spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
 const { DatabaseSync } = require('node:sqlite');
 const maxmind = require('maxmind');
+const helmet = require('helmet');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -326,17 +327,22 @@ function csp(nonce) {
   ].join('; ');
 }
 
-// Security headers on every response.
+// Standard security headers via Helmet (X-Frame-Options, HSTS, nosniff,
+// Referrer-Policy, COOP, etc. — and it strips X-Powered-By). We keep our OWN
+// Content-Security-Policy: it carries a per-request nonce for the inline
+// import-map, which Helmet's static CSP can't express — so Helmet's CSP is
+// disabled here. COEP is left off so the Three.js ES modules load from unpkg.
+app.use(helmet({
+  contentSecurityPolicy: false,
+  crossOriginEmbedderPolicy: false,
+  frameguard: { action: 'deny' },
+}));
+
+// Our CSP (baseline; the '/' route re-sets it with a nonce) + Permissions-Policy
+// (which Helmet doesn't set).
 app.use((req, res, next) => {
-  res.setHeader('X-Content-Type-Options', 'nosniff');
-  res.setHeader('X-Frame-Options', 'DENY');
-  res.setHeader('Referrer-Policy', 'no-referrer');
-  res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), interest-cohort=()');
   res.setHeader('Content-Security-Policy', csp(null));
-  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
-  }
+  res.setHeader('Permissions-Policy', 'geolocation=(), microphone=(), camera=(), interest-cohort=()');
   next();
 });
 

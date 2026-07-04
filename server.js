@@ -414,6 +414,12 @@ app.get('/og', (req, res) => {
   res.type('image/svg+xml').set('Cache-Control', 'public, max-age=3600').send(svg);
 });
 
+// Standalone European-sovereignty explainer + checker page.
+app.get('/sovereignty', (_req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.type('html').sendFile(path.join(__dirname, 'public', 'sovereignty.html'));
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 // Full probe catalog + the default-visualised set.
 app.get('/api/probes', (_req, res) => res.json({ probes: PROBES, preselected: PRESELECTED }));

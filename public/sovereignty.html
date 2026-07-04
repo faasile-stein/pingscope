@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>European Digital Sovereignty Check · PingScope</title>
+  <meta name="description" content="Enter a domain and see where its web and mail really live — and who ultimately controls them. Most of the European web is more American than it looks." />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Is your website actually European?" />
+  <meta property="og:description" content="Trace where a domain's web and mail are hosted and who owns the infrastructure. A sovereignty score meant to start a debate." />
+  <meta property="og:url" content="https://pingscope.net/sovereignty" />
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.ico" sizes="32x32" />
+  <style>
+    :root {
+      --bg: #05060c; --panel: rgba(16, 20, 34, 0.62); --panel-brd: rgba(120, 150, 220, 0.18);
+      --txt: #e7ecff; --muted: #7e88ab; --accent: #4ad8ff; --purple: #b78bff;
+      --good: #36f1a3; --bad: #ff3b6b; --orange: #ff8a3d;
+      --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, monospace;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; background: var(--bg); color: var(--txt);
+      font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif; line-height: 1.6; }
+    body::before { content: ""; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background: radial-gradient(120% 80% at 50% -10%, rgba(74,216,255,0.10), transparent 55%),
+                  radial-gradient(90% 60% at 50% 120%, rgba(183,139,255,0.10), transparent 60%); }
+    .wrap { position: relative; z-index: 1; max-width: 760px; margin: 0 auto; padding: 0 22px 80px; }
+
+    header.top { display: flex; align-items: center; justify-content: space-between; padding: 20px 0 10px; }
+    .brand { display: flex; align-items: center; gap: 11px; text-decoration: none; color: var(--txt); }
+    .brand .logo { font-size: 26px; color: var(--accent); filter: drop-shadow(0 0 10px var(--accent)); animation: spin 9s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .brand b { font-size: 16px; letter-spacing: 4px; font-weight: 700; }
+    .top a.back { font-family: var(--mono); font-size: 12px; color: var(--muted); text-decoration: none;
+      border: 1px solid var(--panel-brd); border-radius: 999px; padding: 6px 13px; }
+    .top a.back:hover { color: var(--accent); border-color: var(--accent); }
+
+    .hero { padding: 40px 0 8px; }
+    .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: 3px; color: var(--purple); text-transform: uppercase; }
+    h1 { font-size: clamp(30px, 6vw, 46px); line-height: 1.1; margin: 14px 0 12px; letter-spacing: -0.5px; }
+    h1 .grad { background: linear-gradient(90deg, var(--accent), var(--purple)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+    .lede { font-size: 18px; color: #cdd5f0; max-width: 62ch; }
+    .lede b { color: var(--txt); }
+
+    /* checker */
+    form.check { display: flex; gap: 10px; margin: 26px 0 8px; flex-wrap: wrap; }
+    form.check input {
+      flex: 1 1 260px; font-family: var(--mono); font-size: 15px; color: var(--txt);
+      background: rgba(0,0,0,.34); border: 1px solid var(--panel-brd); border-radius: 12px; padding: 13px 16px; outline: none;
+    }
+    form.check input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(74,216,255,.16); }
+    form.check button {
+      font-family: var(--mono); font-size: 15px; font-weight: 700; color: #04121a; cursor: pointer;
+      background: var(--accent); border: none; border-radius: 12px; padding: 13px 22px; white-space: nowrap;
+    }
+    form.check button:hover { filter: brightness(1.08); }
+    form.check button:disabled { opacity: .55; cursor: progress; }
+    .examples { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .examples a { color: var(--accent); text-decoration: none; cursor: pointer; }
+    .examples a:hover { text-decoration: underline; }
+
+    /* result */
+    #result { margin: 22px 0 8px; scroll-margin-top: 20px; }
+    .r-loading, .r-error { font-family: var(--mono); font-size: 14px; color: var(--muted); padding: 22px; text-align: center;
+      border: 1px dashed var(--panel-brd); border-radius: 14px; }
+    .r-error { color: var(--bad); border-style: solid; }
+    .r-domain { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+    .r-domain b { color: var(--txt); }
+    .cats { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .cat { min-width: 0; padding: 16px; border-radius: 14px; background: rgba(12,16,30,.55); border: 1px solid var(--panel-brd); }
+    .cat-h { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+    .score { font-family: var(--mono); font-size: 48px; font-weight: 800; line-height: 1; margin-top: 8px; }
+    .score small { font-size: 15px; font-weight: 600; color: var(--muted); }
+    .badge { display: inline-block; margin-top: 8px; font-family: var(--mono); font-size: 11px; text-transform: uppercase;
+      letter-spacing: .5px; border: 1px solid currentColor; border-radius: 999px; padding: 2px 11px; }
+    .srv { display: flex; flex-direction: column; gap: 2px; margin-top: 10px; font-family: var(--mono); font-size: 11.5px; }
+    .srv + .srv { margin-top: 6px; }
+    .srv-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+    .srv-ip { color: var(--txt); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .srv-sub { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+    .srv-geo { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 auto; min-width: 0; }
+    .srv-as { margin-left: auto; flex: none; max-width: 55%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .srv-as.ok { color: var(--good); } .srv-as.bad { color: var(--bad); } .half { color: var(--orange); font-weight: 700; }
+    .transit { margin-top: 12px; padding-top: 9px; border-top: 1px solid var(--panel-brd); font-family: var(--mono); font-size: 10.5px; color: var(--muted); }
+    .transit b { color: var(--txt); } .dim { opacity: .7; }
+    .cat-empty { font-family: var(--mono); font-size: 12px; color: var(--muted); padding: 8px 0; }
+
+    section.doc { margin-top: 48px; }
+    section.doc h2 { font-size: 22px; margin: 40px 0 10px; letter-spacing: -0.3px; }
+    section.doc h2 .n { font-family: var(--mono); color: var(--accent); font-size: 15px; margin-right: 8px; }
+    section.doc p { color: #c3ccea; }
+    section.doc p b, section.doc li b { color: var(--txt); }
+    .rule { display: grid; grid-template-columns: auto 1fr; gap: 12px 14px; margin: 16px 0; font-size: 15px; }
+    .rule .k { font-family: var(--mono); font-size: 13px; color: var(--accent); white-space: nowrap; padding-top: 2px; }
+    .checklist { list-style: none; padding: 0; margin: 14px 0; }
+    .checklist li { padding: 9px 0 9px 30px; position: relative; border-bottom: 1px solid rgba(120,140,200,.10); color: #c3ccea; }
+    .checklist li::before { content: "◵"; position: absolute; left: 4px; color: var(--accent); }
+    .callout { border: 1px solid rgba(255,138,61,.35); background: rgba(255,138,61,.06); border-radius: 14px; padding: 18px 20px; margin: 22px 0; }
+    .callout h3 { margin: 0 0 8px; font-size: 17px; color: var(--orange); }
+    .callout p { margin: 8px 0 0; color: #d5cdbf; }
+    .pill-row { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
+    .pill { font-family: var(--mono); font-size: 12px; padding: 4px 11px; border-radius: 999px; border: 1px solid var(--panel-brd); color: var(--muted); }
+    .pill.ok { color: var(--good); border-color: rgba(54,241,163,.35); }
+    .pill.bad { color: var(--bad); border-color: rgba(255,59,107,.35); }
+    .debate { border-left: 3px solid var(--purple); padding: 4px 0 4px 18px; margin: 18px 0; }
+    .debate p { margin: 10px 0; }
+    footer.foot { margin-top: 54px; padding-top: 20px; border-top: 1px solid var(--panel-brd); font-family: var(--mono); font-size: 12px; color: var(--muted); }
+    footer.foot a { color: var(--accent); text-decoration: none; }
+    @media (max-width: 620px) { .cats { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="top">
+      <a class="brand" href="/"><span class="logo">◵</span><b>PINGSCOPE</b></a>
+      <a class="back" href="/">← live observatory</a>
+    </header>
+
+    <div class="hero">
+      <div class="eyebrow">European digital sovereignty</div>
+      <h1>Is your website <span class="grad">actually European?</span></h1>
+      <p class="lede">Enter a domain. We trace where its <b>web</b> and <b>mail</b> really live — and, just as important, <b>who ultimately controls them</b>. Most of the European web is more American than it looks.</p>
+
+      <form class="check" id="check-form" autocomplete="off">
+        <input id="check-input" type="text" placeholder="yourcompany.eu  ·  a bank  ·  a ministry…" spellcheck="false" />
+        <button type="submit" id="check-btn">Check sovereignty</button>
+      </form>
+      <div class="examples">try
+        <a data-ex="github.com">github.com</a> ·
+        <a data-ex="orange.fr">orange.fr</a> ·
+        <a data-ex="bbc.co.uk">bbc.co.uk</a> ·
+        <a data-ex="telenet.be">telenet.be</a>
+      </div>
+
+      <div id="result"></div>
+    </div>
+
+    <section class="doc">
+      <h2><span class="n">01</span>How the score works</h2>
+      <p>You get <b>two independent scores</b>, 0–100: one for the <b>web</b> (where the site is served) and one for <b>mail</b> (where email is handled). They're separate on purpose — a company can host its site in-region yet run its email through a US provider, or vice-versa.</p>
+      <div class="rule">
+        <div class="k">70% hosting</div>
+        <div>Is each server both <b>located</b> in the sovereign area <b>and owned</b> by a company from it? Fully counts only if both are true.</div>
+        <div class="k">30% transit</div>
+        <div>How much of the network path from our EU vantage stays on <b>sovereign networks</b> rather than routing through foreign ones.</div>
+        <div class="k">½ ownership</div>
+        <div>A server <b>hosted in the EU but owned by a non-sovereign company</b> counts <b>half</b>. A German data centre operated by a US firm is still reachable under the <b>US CLOUD Act</b> — the disks are here, the jurisdiction is not.</div>
+      </div>
+      <div class="pill-row">
+        <span class="pill">Sovereign area:</span>
+        <span class="pill ok">🇪🇺 EU-27</span>
+        <span class="pill ok">🇨🇭 Switzerland</span>
+        <span class="pill ok">🇬🇧 United Kingdom</span>
+        <span class="pill ok">🇮🇸 Iceland</span>
+        <span class="pill bad">everywhere else</span>
+      </div>
+      <p class="dim" style="font-size:14px">Switzerland, the UK and Iceland are included on adequacy / EEA grounds. That's a choice you're free to disagree with — see §04.</p>
+
+      <h2><span class="n">02</span>What we actually check</h2>
+      <ul class="checklist">
+        <li><b>Web servers</b> — the domain's <b>A / AAAA</b> records: the IPs your browser connects to.</li>
+        <li><b>Mail servers</b> — the domain's <b>MX</b> records, then each mail host's A / AAAA: where your email is delivered.</li>
+        <li><b>Physical location</b> — offline GeoIP (DB-IP) for every server and every hop. No third-party API sees your query.</li>
+        <li><b>Corporate ownership</b> — the operating network's AS registration, plus a name map for multinationals: an Ireland-registered <i>“Amazon Data Services Ireland”</i> is still US-owned.</li>
+        <li><b>The route</b> — a live <b>traceroute</b> from our European vantage to each endpoint, so the path itself is scored, not just the destination.</li>
+      </ul>
+
+      <div class="callout">
+        <h3>⚠ The CDN &amp; anycast caveat — read this</h3>
+        <p>This is where naive “where is the IP?” checks fall apart. <b>CDNs and anycast blur the map.</b> Cloudflare, Fastly, Akamai, AWS CloudFront, Google Cloud and Azure Front Door serve your site from an edge node that may physically sit in Frankfurt or Amsterdam — so a location-only check happily reports <i>“Europe.”</i></p>
+        <p>But that edge is <b>operated by a US company</b>. TLS terminates on their hardware, the origin, control plane, logs and legal entity are American, and <b>physical location ≠ legal jurisdiction</b>. That's exactly why we <b>halve</b> EU-located-but-foreign-owned hosting instead of awarding full marks — a deliberate, arguable call.</p>
+        <p>Anycast also means <b>the IP you get depends on where you ask from</b>. This score reflects the path <b>from our vantage</b>, not a single global truth. A CDN-fronted site can look different from Paris, São Paulo or Singapore.</p>
+      </div>
+
+      <h2><span class="n">03</span>Why a score, and not a verdict</h2>
+      <p>“Sovereign” has <b>no single legal definition</b>. Adequacy decisions, the CLOUD Act, <i>Schrems II</i>, GDPR, Gaia-X, EuroStack — serious people draw the line in different places. This tool takes a position so it can produce a number; the number is an <b>invitation to argue</b>, not a compliance rating.</p>
+      <div class="debate">
+        <p><b>A 100 doesn't mean “safe”</b> and a <b>30 doesn't mean “illegal.”</b> It means: here is <b>who can be compelled to hand over your data</b>, and under <b>whose law</b>.</p>
+        <p>We count the <b>UK</b> as sovereign — post-Brexit, some would exclude it. We count <b>Switzerland</b> and <b>Iceland</b> in — others would keep the line at the EU-27. Redraw it and the scores move.</p>
+        <p>The uncomfortable part: run this on European <b>banks, ministries, hospitals, universities</b>, and a great deal of critical European infrastructure lands <b>below 50</b>. That's the conversation worth having — not whether one score is off by five points.</p>
+      </div>
+
+      <h2><span class="n">04</span>Limits &amp; honesty</h2>
+      <p>Geolocation and ownership are <b>estimated from public IP data and AS registries</b>; ownership is a curated heuristic that won't catch every foreign-owned EU brand (the honest fallback is the AS registration country). This is <b>not legal advice</b>, and a good score is not a guarantee. It's an evidence-based starting point — and it's <a href="https://github.com/faasile-stein/pingscope">open source</a>, so improve the data.</p>
+
+      <form class="check" id="check-form-2" autocomplete="off" style="margin-top:28px">
+        <input id="check-input-2" type="text" placeholder="check another domain…" spellcheck="false" />
+        <button type="submit">Check sovereignty</button>
+      </form>
+    </section>
+
+    <footer class="foot">
+      PingScope — a live latency observatory · sovereignty is estimated, debatable, and open source.
+      <a href="/">open the live tool ↗</a> · <a href="https://github.com/faasile-stein/pingscope">GitHub ↗</a><br>
+      hosted on <a href="https://bootload.io">bootload.io</a> · with the help of <a href="https://upgreat.ai">upgreat.ai</a>
+    </footer>
+  </div>
+
+  <script src="./sovereignty.js"></script>
+</body>
+</html>

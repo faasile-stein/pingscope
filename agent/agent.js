@@ -6,6 +6,7 @@
 // anything but `mtr`, and rate-limits itself.
 
 const { spawn } = require('child_process');
+const net = require('net');
 const WebSocket = require('ws');
 
 const SERVER = process.env.PINGSCOPE_URL || 'wss://pingscope.net/agent';
@@ -19,8 +20,8 @@ const MAX_PER_MIN = Number(process.env.AGENT_MAX_PER_MIN || 20);
 
 if (!TOKEN) { console.error('AGENT_TOKEN is required. Set it and restart.'); process.exit(1); }
 
-// --- target safety: only public unicast IPv4 ---
-function isPublicIp(ip) {
+// --- target safety: only public unicast addresses (IPv4 or IPv6) ---
+function isPublicIpv4(ip) {
   const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
   if (!m) return false;
   const o = m.slice(1).map(Number);
@@ -32,6 +33,27 @@ function isPublicIp(ip) {
   if (a === 192 && b === 168) return false;                              // private
   if (a === 100 && b >= 64 && b <= 127) return false;                    // CGNAT
   return true;
+}
+
+function isPublicIpv6(ip) {
+  const a = ip.toLowerCase();
+  const mapped = a.match(/^::(?:ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mapped) return isPublicIpv4(mapped[1]);                            // v4-mapped tail
+  if (a === '::' || a === '::1') return false;                          // unspecified, loopback
+  const first = a.startsWith('::') ? 0 : parseInt(a.split(':')[0] || '0', 16);
+  if (Number.isNaN(first)) return false;
+  if ((first & 0xffc0) === 0xfe80) return false;                        // fe80::/10 link-local
+  if ((first & 0xfe00) === 0xfc00) return false;                        // fc00::/7  unique-local
+  if ((first & 0xff00) === 0xff00) return false;                        // ff00::/8  multicast
+  if (first === 0x2001 && parseInt(a.split(':')[1] || '', 16) === 0x0db8) return false; // docs
+  return true;
+}
+
+function isPublicIp(ip) {
+  const f = net.isIP(ip);
+  if (f === 4) return isPublicIpv4(ip);
+  if (f === 6) return isPublicIpv6(ip);
+  return false;
 }
 
 // --- self rate limiting ---

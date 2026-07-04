@@ -5,6 +5,7 @@ const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const dns = require('dns').promises;
+const net = require('net');
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
@@ -30,6 +31,76 @@ const PINGS_PER_TICK = Number(process.env.PINGS_PER_TICK || 5);  // pings/host/t
 const FPING_PERIOD_MS = Number(process.env.FPING_PERIOD_MS || 120); // spacing
 const HISTORY = 600;           // seconds of history replayed to a fresh client
 
+// ---------------------------------------------------------------------------
+// IP classification — shared by the ping engine, MTR, and geo (IPv4 + IPv6)
+// ---------------------------------------------------------------------------
+
+// Resolve a hostname to an address, preferring IPv4 (broadest reachability, and
+// community agents may lack IPv6) but falling back to IPv6-only hosts.
+async function lookupHost(host) {
+  try { return await dns.lookup(host, { family: 4 }); }
+  catch { return await dns.lookup(host, { family: 6 }); }
+}
+
+// Public unicast IPv4? (rejects this-net, private, loopback, CGNAT, link-local,
+// multicast/reserved.)
+function isPublicIpv4(ip) {
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
+  if (!m) return false;
+  const o = m.slice(1).map(Number);
+  if (o.some((n) => n > 255)) return false;
+  const [a, b] = o;
+  if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
+  if (a === 169 && b === 254) return false;
+  if (a === 172 && b >= 16 && b <= 31) return false;
+  if (a === 192 && b === 168) return false;
+  if (a === 100 && b >= 64 && b <= 127) return false;
+  return true;
+}
+
+// Public (globally routable) unicast IPv6? Rejects loopback/unspecified,
+// link-local (fe80::/10), unique-local (fc00::/7), multicast (ff00::/8) and the
+// documentation range; v4-mapped tails fall through to the IPv4 rules.
+function isPublicIpv6(ip) {
+  const a = ip.toLowerCase();
+  const mapped = a.match(/^::(?:ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/);
+  if (mapped) return isPublicIpv4(mapped[1]);
+  if (a === '::' || a === '::1') return false;
+  const first = a.startsWith('::') ? 0 : parseInt(a.split(':')[0] || '0', 16);
+  if (Number.isNaN(first)) return false;
+  if ((first & 0xffc0) === 0xfe80) return false;   // fe80::/10 link-local
+  if ((first & 0xfe00) === 0xfc00) return false;   // fc00::/7  unique-local
+  if ((first & 0xff00) === 0xff00) return false;   // ff00::/8  multicast
+  if (first === 0x2001 && parseInt(a.split(':')[1] || '', 16) === 0x0db8) return false; // docs
+  return true;
+}
+
+// Public routable address of either family.
+function isPublicIp(ip) {
+  const f = net.isIP(ip);
+  if (f === 4) return isPublicIpv4(ip);
+  if (f === 6) return isPublicIpv6(ip);
+  return false;
+}
+
+// Non-routable / special-use address (used to skip reverse-DNS + mark geo).
+function isPrivateIp(ip) {
+  const f = net.isIP(ip);
+  if (f === 4) {
+    const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(ip);
+    const [a, b] = [Number(m[1]), Number(m[2])];
+    return (
+      a === 10 || a === 127 ||
+      (a === 172 && b >= 16 && b <= 31) ||
+      (a === 192 && b === 168) ||
+      (a === 169 && b === 254) ||
+      (a === 100 && b >= 64 && b <= 127) // CGNAT
+    );
+  }
+  if (f === 6) return !isPublicIpv6(ip);
+  return false;
+}
+
 // Parse the flat config — "type | ip-or-hostname | display name | flags".
 function parseConf(text) {
   const specs = [];
@@ -50,8 +121,8 @@ function parseConf(text) {
 async function buildCatalog() {
   const specs = parseConf(fs.readFileSync(PROBES_CONF, 'utf8'));
   await Promise.all(specs.map(async (s) => {
-    if (/^\d+\.\d+\.\d+\.\d+$/.test(s.host)) { s._ip = s.host; return; }
-    try { s._ip = (await dns.lookup(s.host, { family: 4 })).address; }
+    if (net.isIP(s.host)) { s._ip = s.host; return; }   // IPv4 or IPv6 literal
+    try { s._ip = (await lookupHost(s.host)).address; }
     catch { s._ip = null; console.warn('  probe: cannot resolve', s.host); }
   }));
   await Promise.all(specs.map(async (s) => { if (s._ip) s._ptr = await reverseDns(s._ip).catch(() => null); }));
@@ -64,7 +135,7 @@ async function buildCatalog() {
     const g = s.anycast ? null : geoLookup(ip);
     const coords = geoLookup(ip); // always resolve lat/lon (incl. anycast) for the globe
     out.push({
-      id: `${s.type}-${ip.replace(/\./g, '-')}`,
+      id: `${s.type}-${ip.replace(/[.:]/g, '-')}`,
       type: s.type, ip, host: s.host !== ip ? s.host : undefined,
       provider: s.name, label: s.name, anycast: !!s.anycast,
       country: s.anycast ? 'Anycast' : ((g && g.country) || 'Unknown'),
@@ -121,12 +192,13 @@ const RETENTION_DAYS = Number(process.env.RETENTION_DAYS || 7);
 // of hosts; a per-host ping spawn would not).
 // ---------------------------------------------------------------------------
 
-// Run one fping sweep over every probe IP. Returns Map(ip -> {sent,recv,loss,min,avg,max}).
-function fpingSweep(ips) {
+// One fping process over a single-family batch. `-4`/`-6` picks the family;
+// fping can't mix families in one invocation. Returns Map(ip -> summary).
+function fpingBatch(ips, familyFlag) {
   return new Promise((resolve) => {
     if (!ips.length) return resolve(new Map());
     // -q summary to stderr; -c N pings each host N times; -p spacing; -t timeout.
-    const args = ['-q', '-c', String(PINGS_PER_TICK), '-p', String(FPING_PERIOD_MS), '-t', '1000', ...ips];
+    const args = [familyFlag, '-q', '-c', String(PINGS_PER_TICK), '-p', String(FPING_PERIOD_MS), '-t', '1000', ...ips];
     const fp = spawn('fping', args);
     let err = '';
     const kill = setTimeout(() => fp.kill('SIGKILL'), 8000);
@@ -137,6 +209,7 @@ function fpingSweep(ips) {
       const m = new Map();
       for (const line of err.split('\n')) {
         // "8.8.8.8 : xmt/rcv/%loss = 5/5/0%, min/avg/max = 14.2/15.1/16.0"
+        // (IPv6 first token: "2001:4860:4860::8888 : xmt/rcv/…")
         const mm = line.match(/^(\S+)\s*:\s*xmt\/rcv\/%loss\s*=\s*(\d+)\/(\d+)\/(\d+)%(?:,\s*min\/avg\/max\s*=\s*([\d.]+)\/([\d.]+)\/([\d.]+))?/);
         if (!mm) continue;
         m.set(mm[1], {
@@ -147,6 +220,14 @@ function fpingSweep(ips) {
       resolve(m);
     });
   });
+}
+
+// Sweep every probe IP, one fping process per family. Returns Map(ip -> summary).
+async function fpingSweep(ips) {
+  const v4 = ips.filter((ip) => net.isIP(ip) === 4);
+  const v6 = ips.filter((ip) => net.isIP(ip) === 6);
+  const [m4, m6] = await Promise.all([fpingBatch(v4, '-4'), fpingBatch(v6, '-6')]);
+  return new Map([...m4, ...m6]);
 }
 
 // Turn an fping result into a SmokePing-style sample. fping gives min/avg/max +
@@ -518,10 +599,7 @@ async function loop() {
 // ---------------------------------------------------------------------------
 function isValidHost(s) {
   if (typeof s !== 'string' || s.length === 0 || s.length > 253) return false;
-  // IPv4 with octet range check
-  if (/^(\d{1,3})(\.\d{1,3}){3}$/.test(s)) {
-    return s.split('.').every((o) => Number(o) >= 0 && Number(o) <= 255);
-  }
+  if (net.isIP(s)) return true; // IPv4 or IPv6 literal
   // Hostname: letters/digits/dot/hyphen only (no shell metacharacters)
   return /^(?=.{1,253}$)([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(s);
 }
@@ -546,19 +624,6 @@ async function reverseDns(ip) {
 
 function resolveNames(ips) {
   return Promise.all([...new Set(ips)].filter((ip) => ip && !isPrivateIp(ip)).map(reverseDns));
-}
-
-function isPrivateIp(ip) {
-  const m = /^(\d+)\.(\d+)\.(\d+)\.(\d+)$/.exec(ip);
-  if (!m) return false;
-  const [a, b] = [Number(m[1]), Number(m[2])];
-  return (
-    a === 10 || a === 127 ||
-    (a === 172 && b >= 16 && b <= 31) ||
-    (a === 192 && b === 168) ||
-    (a === 169 && b === 254) ||
-    (a === 100 && b >= 64 && b <= 127) // CGNAT
-  );
 }
 
 // Offline IP geolocation via bundled DB-IP Lite MMDB files (no runtime API
@@ -604,11 +669,11 @@ function asnOrg(asn, fallback) {
 function geoLookup(ip) {
   if (geoCache.has(ip)) return geoCache.get(ip);
   let g;
-  if (isPrivateIp(ip)) {
-    g = { private: true, city: '', country: 'Private network', cc: '' };
-  } else if (!/^\d+\.\d+\.\d+\.\d+$/.test(ip)) {
+  if (!net.isIP(ip)) {                 // not an address (e.g. an unresolved host)
     g = { city: '', country: '', cc: '' };
-  } else {
+  } else if (isPrivateIp(ip)) {
+    g = { private: true, city: '', country: 'Private network', cc: '' };
+  } else {                             // IPv4 or IPv6 — DB-IP MMDBs cover both
     const c = cityReader ? cityReader.get(ip) : null;
     const a = asnReader ? asnReader.get(ip) : null;
     g = {
@@ -648,21 +713,6 @@ function stopMtr(session) {
   }
 }
 
-// public unicast IPv4 only (mirrors the agent's own guard)
-function isPublicIp(ip) {
-  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(ip);
-  if (!m) return false;
-  const o = m.slice(1).map(Number);
-  if (o.some((n) => n > 255)) return false;
-  const [a, b] = o;
-  if (a === 0 || a === 10 || a === 127 || a >= 224) return false;
-  if (a === 169 && b === 254) return false;
-  if (a === 172 && b >= 16 && b <= 31) return false;
-  if (a === 192 && b === 168) return false;
-  if (a === 100 && b >= 64 && b <= 127) return false;
-  return true;
-}
-
 // Distributed MTR: our own live trace + a one-shot from each selected agent.
 async function startDistributed(ws, session, rawTarget, vantages) {
   stopMtr(session);
@@ -672,10 +722,11 @@ async function startDistributed(ws, session, rawTarget, vantages) {
   if (!isValidHost(rawTarget)) {
     return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: `refused: "${String(rawTarget).slice(0, 64)}"` }));
   }
-  // resolve to a public IPv4 — agents require an IP and must never hit private space
+  // resolve to a public IP (v4 or v6) — agents require an IP and must never hit
+  // private space. Hostnames prefer IPv4 for reachability, falling back to AAAA.
   let ip = rawTarget;
-  if (!/^\d+\.\d+\.\d+\.\d+$/.test(rawTarget)) {
-    try { ip = (await dns.lookup(rawTarget, { family: 4 })).address; }
+  if (!net.isIP(rawTarget)) {
+    try { ip = (await lookupHost(rawTarget)).address; }
     catch { return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'cannot resolve' })); }
   }
   if (!isPublicIp(ip)) {

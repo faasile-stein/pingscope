@@ -660,3 +660,69 @@ function handleMtr(msg) {
   if (msg.hops) { MtrMap.setHops(source, msg.hops, meta); updateStageMeta(); updateEuBox(); }
   if (msg.error) { MtrMap.setTrackError(source, msg.error, meta); }
 }
+
+// ---- sovereignty score: web (A/AAAA) + mail (MX) hosting & route ----
+const sovStage = document.getElementById('sov-stage');
+const sovBody = document.getElementById('sov-body');
+const sovDomain = document.getElementById('sov-domain');
+const sovGo = document.getElementById('sov-go');
+// pctColor is green@0 → red@100; a sovereignty score is the inverse.
+const sovColor = (s) => (s == null ? 'var(--muted)' : pctColor(100 - s));
+const sovLabel = (s) => (s == null ? 'no data' : s >= 80 ? 'sovereign' : s >= 50 ? 'partial' : 'non-sovereign');
+
+function sovCategoryHtml(title, icon, cat, emptyMsg) {
+  if (!cat || (cat.score == null && (!cat.servers || !cat.servers.length))) {
+    return `<div class="sov-cat"><div class="sov-cat-h">${icon} ${title}</div><div class="sov-empty">${esc(emptyMsg)}</div></div>`;
+  }
+  const s = cat.score, color = sovColor(s);
+  const servers = (cat.servers || []).map((sv) =>
+    `<div class="sov-srv">` +
+    `<div class="sov-srv-top"><span class="sov-flag">${ccFlag(sv.cc)}</span>` +
+    `<span class="sov-srv-ip" title="${esc(sv.ip)}">${esc(sv.exchange || sv.ip)}</span></div>` +
+    `<div class="sov-srv-sub">` +
+    `<span class="sov-srv-geo">${esc([sv.city, sv.country].filter(Boolean).join(', ') || 'location unknown')}</span>` +
+    `<span class="sov-srv-as ${sv.eu ? 'eu' : 'non'}">${esc(sv.asName || sv.as || '')}</span>` +
+    `</div></div>`).join('') || `<div class="sov-empty">no servers resolved</div>`;
+  const transit = cat.transit
+    ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks outside EU`
+    : `<span class="sov-dim">route not measured (target blocks traceroute)</span>`;
+  return `<div class="sov-cat">
+    <div class="sov-cat-h">${icon} ${title}</div>
+    <div class="sov-score" style="color:${color}">${s == null ? '—' : s}<span class="sov-score-max">/100</span></div>
+    <div class="sov-badge2" style="color:${color};border-color:${color}">${sovLabel(s)}</div>
+    <div class="sov-srvs">${servers}</div>
+    <div class="sov-transit">${transit}</div>
+  </div>`;
+}
+
+function renderSov(data) {
+  sovDomain.textContent = data.domain;
+  sovBody.innerHTML =
+    sovCategoryHtml('Web', '🌐', data.web, 'no web servers found') +
+    sovCategoryHtml('Mail', '✉️', data.mail, `no mail servers (no MX record for ${data.mailDomain || data.domain})`);
+}
+
+async function runSovereignty(input) {
+  if (!input) { mtrIp.focus(); return; }
+  sovDomain.textContent = input;
+  sovBody.innerHTML = '<div class="sov-loading">scanning web + mail routes…</div>';
+  sovStage.classList.remove('hidden');
+  document.body.classList.add('sov-open');
+  sovGo.disabled = true;
+  try {
+    const res = await fetch('/api/sovereignty?url=' + encodeURIComponent(input));
+    const data = await res.json();
+    if (!res.ok) { sovBody.innerHTML = `<div class="sov-err">${esc(data.error || 'scan failed')}</div>`; return; }
+    renderSov(data);
+  } catch {
+    sovBody.innerHTML = '<div class="sov-err">scan failed — network error</div>';
+  } finally {
+    sovGo.disabled = false;
+  }
+}
+
+function closeSov() { sovStage.classList.add('hidden'); document.body.classList.remove('sov-open'); }
+sovGo.onclick = () => runSovereignty(mtrIp.value.trim());
+document.getElementById('sov-close').onclick = closeSov;
+document.getElementById('sov-backdrop').onclick = closeSov;
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !sovStage.classList.contains('hidden')) closeSov(); });

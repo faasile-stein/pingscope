@@ -289,6 +289,66 @@ body::after {
   white-space: nowrap;
 }
 #mtr-go:disabled { opacity: .5; cursor: progress; }
+#sov-go {
+  font-family: var(--mono); font-size: 12px; font-weight: 700; white-space: nowrap;
+  color: var(--faastic); background: rgba(183, 139, 255, .12);
+  border: 1px solid rgba(183, 139, 255, .45); border-radius: 8px;
+  padding: 6px 11px; cursor: pointer; transition: .15s;
+}
+#sov-go:hover { color: #120a1e; background: var(--faastic); border-color: var(--faastic); }
+#sov-go:disabled { opacity: .5; cursor: progress; }
+
+/* ---- sovereignty score overlay ---- */
+.sov-stage { position: fixed; inset: 0; z-index: 12; display: flex; align-items: center; justify-content: center; }
+.sov-stage.hidden { display: none; }
+.sov-backdrop { position: absolute; inset: 0; background: rgba(3, 5, 11, 0.72); backdrop-filter: blur(6px); }
+.sov-card {
+  position: relative; z-index: 1; width: min(680px, 94vw); max-height: 90vh; overflow-y: auto;
+  background: var(--panel); border: 1px solid var(--panel-brd); border-radius: 16px;
+  backdrop-filter: blur(16px); box-shadow: 0 24px 70px rgba(0,0,0,0.6); padding: 18px 20px 14px;
+}
+.sov-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sov-title { font-family: var(--mono); font-size: 14px; letter-spacing: .5px; color: var(--muted); }
+.sov-title b { color: var(--txt); font-weight: 700; margin-left: 4px; }
+.sov-close {
+  font-family: var(--mono); font-size: 14px; color: var(--muted);
+  background: rgba(120,150,220,.12); border: 1px solid var(--panel-brd); border-radius: 8px;
+  width: 30px; height: 30px; cursor: pointer; transition: .15s; flex: none;
+}
+.sov-close:hover { color: var(--bad); border-color: var(--bad); }
+.sov-body { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.sov-loading, .sov-err { grid-column: 1 / -1; text-align: center; padding: 34px 0; font-family: var(--mono); font-size: 13px; color: var(--muted); }
+.sov-err { color: var(--bad); }
+.sov-cat {
+  min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 14px;
+  background: rgba(12, 16, 30, 0.5); border: 1px solid rgba(120, 140, 200, 0.14); border-radius: 13px;
+}
+.sov-cat-h { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.sov-score { font-family: var(--mono); font-size: 46px; font-weight: 800; line-height: 1; }
+.sov-score-max { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+.sov-badge2 {
+  align-self: flex-start; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
+  border: 1px solid currentColor; border-radius: 999px; padding: 2px 10px; opacity: .95;
+}
+.sov-srvs { display: flex; flex-direction: column; gap: 8px; margin-top: 3px; }
+.sov-srv { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: 11px; }
+.sov-srv-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
+.sov-flag { flex: none; }
+.sov-srv-ip { color: var(--txt); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sov-srv-sub { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.sov-srv-geo { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+.sov-srv-as { margin-left: auto; flex: none; font-size: 10px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sov-srv-as.eu { color: var(--good); }
+.sov-srv-as.non { color: var(--bad); }
+.sov-empty { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 6px 0; }
+.sov-transit { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--panel-brd); }
+.sov-transit b { color: var(--txt); }
+.sov-dim { opacity: .7; }
+.sov-note { font-family: var(--mono); font-size: 10px; color: var(--muted); opacity: .75; margin-top: 12px; text-align: center; }
+@media (max-width: 560px) {
+  .sov-body { grid-template-columns: 1fr; }
+  .sov-score { font-size: 40px; }
+}
 
 /* vantage chips (community agents) */
 .mtr-vantages { display: flex; flex-wrap: wrap; gap: 5px; padding: 0 12px 11px; max-width: 360px; }

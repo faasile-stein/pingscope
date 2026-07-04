@@ -105,8 +105,9 @@
     <div class="mtr-head">
       <span class="mtr-title">⊹ mtr</span>
       <form id="mtr-form" autocomplete="off">
-        <input id="mtr-ip" type="text" placeholder="IP or host to trace…" spellcheck="false" />
+        <input id="mtr-ip" type="text" placeholder="IP, domain, or URL…" spellcheck="false" />
         <button type="submit" id="mtr-go">▶ run</button>
+        <button type="button" id="sov-go" title="score EU sovereignty of this site's web + mail hosting">⚖ score</button>
       </form>
     </div>
     <div id="mtr-vantages" class="mtr-vantages"></div>
@@ -141,6 +142,19 @@
   </div>
 
   <div id="readout" class="readout hidden"></div>
+
+  <!-- sovereignty score: web (A/AAAA) + mail (MX) hosting & route, EU-27 -->
+  <div id="sov-stage" class="sov-stage hidden">
+    <div class="sov-backdrop" id="sov-backdrop"></div>
+    <div class="sov-card">
+      <div class="sov-top">
+        <div class="sov-title">⚖ EU sovereignty <b id="sov-domain">—</b></div>
+        <button id="sov-close" class="sov-close" title="close">✕</button>
+      </div>
+      <div id="sov-body" class="sov-body"><div class="sov-loading">scanning…</div></div>
+      <div class="sov-note">Score = hosting jurisdiction (70%) + transit route (30%), scored against the EU-27. Geo estimated from public IP.</div>
+    </div>
+  </div>
 
   <footer id="appfooter" class="appfooter">
     <span>PingScope is <b>open source</b> — host your own or contribute a vantage</span>

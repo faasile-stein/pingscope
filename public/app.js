@@ -381,6 +381,8 @@ function connect() {
       maybeRecomputeTop();
     } else if (msg.type === 'mtr') {
       handleMtr(msg);
+    } else if (msg.type === 'sov') {
+      handleSov(msg);
     }
   };
 }
@@ -662,6 +664,7 @@ function handleMtr(msg) {
 }
 
 // ---- sovereignty score: web (A/AAAA) + mail (MX) hosting & route ----
+// Streamed over the WS: resolve → live hops per route → final scores.
 const sovStage = document.getElementById('sov-stage');
 const sovBody = document.getElementById('sov-body');
 const sovDomain = document.getElementById('sov-domain');
@@ -670,58 +673,114 @@ const sovGo = document.getElementById('sov-go');
 const sovColor = (s) => (s == null ? 'var(--muted)' : pctColor(100 - s));
 const sovLabel = (s) => (s == null ? 'no data' : s >= 80 ? 'sovereign' : s >= 50 ? 'partial' : 'non-sovereign');
 
-function sovCategoryHtml(title, icon, cat, emptyMsg) {
-  if (!cat || (cat.score == null && (!cat.servers || !cat.servers.length))) {
+// live scan state: { domain, mailDomain, web:{servers,hops,score,transit,done}, mail:{…} }
+let sovScan = null;
+
+function sovHopsHtml(hops) {
+  if (!hops || !hops.length) return `<div class="sov-hop-wait">tracing route…</div>`;
+  return hops.map((h) => {
+    const g = h.geo || {};
+    const cc = (g.cc || '').toUpperCase();
+    const loc = [g.city, g.country].filter(Boolean).join(', ');
+    const rt = h.last != null ? `${h.last < 10 ? h.last.toFixed(1) : Math.round(h.last)}ms` : '';
+    return `<div class="sov-hop">` +
+      `<span class="sov-hop-i">${h.idx}</span>` +
+      `<span class="sov-hop-flag">${h.host ? ccFlag(cc) : '·'}</span>` +
+      `<span class="sov-hop-host">${esc(h.host || '*')}</span>` +
+      `<span class="sov-hop-loc">${esc(loc)}</span>` +
+      `<span class="sov-hop-rt">${rt}</span>` +
+      `</div>`;
+  }).join('');
+}
+
+function sovCategoryHtml(title, icon, key, cat, emptyMsg) {
+  if (cat && cat.empty) {
     return `<div class="sov-cat"><div class="sov-cat-h">${icon} ${title}</div><div class="sov-empty">${esc(emptyMsg)}</div></div>`;
   }
-  const s = cat.score, color = sovColor(s);
+  if (!cat) {
+    return `<div class="sov-cat"><div class="sov-cat-h">${icon} ${title}</div><div class="sov-hop-wait">resolving…</div></div>`;
+  }
+  const s = cat.done ? cat.score : null, color = sovColor(cat.done ? s : null);
+  const primaryIp = (cat.servers && cat.servers[0] && cat.servers[0].ip) || '';
   const servers = (cat.servers || []).map((sv) =>
-    `<div class="sov-srv">` +
+    `<button type="button" class="sov-srv" data-ip="${esc(sv.ip)}" title="open full MTR → ${esc(sv.ip)}">` +
     `<div class="sov-srv-top"><span class="sov-flag">${ccFlag(sv.cc)}</span>` +
-    `<span class="sov-srv-ip" title="${esc(sv.ip)}">${esc(sv.exchange || sv.ip)}</span></div>` +
+    `<span class="sov-srv-ip">${esc(sv.exchange || sv.ip)}</span><span class="sov-srv-go">MTR ↗</span></div>` +
     `<div class="sov-srv-sub">` +
     `<span class="sov-srv-geo">${esc([sv.city, sv.country].filter(Boolean).join(', ') || 'location unknown')}</span>` +
     `<span class="sov-srv-as ${sv.eu ? 'eu' : 'non'}">${esc(sv.asName || sv.as || '')}</span>` +
-    `</div></div>`).join('') || `<div class="sov-empty">no servers resolved</div>`;
-  const transit = cat.transit
-    ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks outside EU`
-    : `<span class="sov-dim">route not measured (target blocks traceroute)</span>`;
-  return `<div class="sov-cat">
-    <div class="sov-cat-h">${icon} ${title}</div>
-    <div class="sov-score" style="color:${color}">${s == null ? '—' : s}<span class="sov-score-max">/100</span></div>
-    <div class="sov-badge2" style="color:${color};border-color:${color}">${sovLabel(s)}</div>
+    `</div></button>`).join('') || `<div class="sov-empty">no servers resolved</div>`;
+  const scoreBlock = cat.done
+    ? `<div class="sov-score" style="color:${color}">${s == null ? '—' : s}<span class="sov-score-max">/100</span></div>
+       <div class="sov-badge2" style="color:${color};border-color:${color}">${sovLabel(s)}</div>`
+    : `<div class="sov-scoring">tracing route…</div>`;
+  const transit = cat.done
+    ? (cat.transit
+        ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks outside EU`
+        : `<span class="sov-dim">route not measured (target blocks traceroute)</span>`)
+    : '';
+  return `<div class="sov-cat" data-cat="${key}">
+    <div class="sov-cat-h">${icon} ${title}${primaryIp ? `<button type="button" class="sov-open-mtr" data-ip="${esc(primaryIp)}" title="open full MTR → ${esc(primaryIp)}">open MTR ↗</button>` : ''}</div>
+    ${scoreBlock}
     <div class="sov-srvs">${servers}</div>
-    <div class="sov-transit">${transit}</div>
+    <div class="sov-hops">${sovHopsHtml(cat.hops)}</div>
+    ${transit ? `<div class="sov-transit">${transit}</div>` : ''}
   </div>`;
 }
 
-function renderSov(data) {
-  sovDomain.textContent = data.domain;
+function renderSov() {
+  if (!sovScan) return;
+  sovDomain.textContent = sovScan.domain || '—';
+  if (sovScan.error) { sovBody.innerHTML = `<div class="sov-err">${esc(sovScan.error)}</div>`; return; }
   sovBody.innerHTML =
-    sovCategoryHtml('Web', '🌐', data.web, 'no web servers found') +
-    sovCategoryHtml('Mail', '✉️', data.mail, `no mail servers (no MX record for ${data.mailDomain || data.domain})`);
+    sovCategoryHtml('Web', '🌐', 'web', sovScan.web, 'no web servers found') +
+    sovCategoryHtml('Mail', '✉️', 'mail', sovScan.mail, `no mail servers (no MX record for ${sovScan.mailDomain || sovScan.domain || ''})`);
+  // wire click-through to the full MTR for every server row + header button
+  sovBody.querySelectorAll('[data-ip]').forEach((el) => {
+    el.onclick = () => { const ip = el.getAttribute('data-ip'); if (ip) openMtrFromSov(ip); };
+  });
 }
 
-async function runSovereignty(input) {
-  if (!input) { mtrIp.focus(); return; }
-  sovDomain.textContent = input;
-  sovBody.innerHTML = '<div class="sov-loading">scanning web + mail routes…</div>';
-  sovStage.classList.remove('hidden');
-  document.body.classList.add('sov-open');
-  sovGo.disabled = true;
-  try {
-    const res = await fetch('/api/sovereignty?url=' + encodeURIComponent(input));
-    const data = await res.json();
-    if (!res.ok) { sovBody.innerHTML = `<div class="sov-err">${esc(data.error || 'scan failed')}</div>`; return; }
-    renderSov(data);
-  } catch {
-    sovBody.innerHTML = '<div class="sov-err">scan failed — network error</div>';
-  } finally {
+function openMtrFromSov(ip) {
+  closeSov();
+  mtrIp.value = ip;
+  openMtr(ip);
+}
+
+function handleSov(msg) {
+  if (!sovScan) return;
+  if (msg.phase === 'error') { sovScan.error = msg.error || 'scan failed'; sovGo.disabled = false; renderSov(); return; }
+  if (msg.phase === 'resolved') {
+    sovScan.domain = msg.domain; sovScan.mailDomain = msg.mailDomain;
+    sovScan.web = msg.web && msg.web.length ? { servers: msg.web, hops: [], done: false } : { empty: true };
+    sovScan.mail = msg.mail && msg.mail.length ? { servers: msg.mail, hops: [], done: false } : { empty: true };
+    renderSov(); return;
+  }
+  if (msg.phase === 'trace') {
+    const cat = sovScan[msg.cat];
+    if (cat && !cat.empty) { cat.hops = msg.hops || []; renderSov(); }
+    return;
+  }
+  if (msg.phase === 'done') {
+    if (msg.web) sovScan.web = { ...(sovScan.web || {}), ...msg.web, done: true };
+    if (msg.mail) sovScan.mail = { ...(sovScan.mail || {}), ...msg.mail, done: true };
     sovGo.disabled = false;
+    renderSov();
   }
 }
 
-function closeSov() { sovStage.classList.add('hidden'); document.body.classList.remove('sov-open'); }
+function runSovereignty(input) {
+  if (!input) { mtrIp.focus(); return; }
+  if (ws.readyState !== 1) return;
+  sovScan = { domain: input, mailDomain: '', web: null, mail: null, error: null };
+  sovStage.classList.remove('hidden');
+  document.body.classList.add('sov-open');
+  sovGo.disabled = true;
+  renderSov();
+  ws.send(JSON.stringify({ type: 'sov', url: input }));
+}
+
+function closeSov() { sovStage.classList.add('hidden'); document.body.classList.remove('sov-open'); sovGo.disabled = false; }
 sovGo.onclick = () => runSovereignty(mtrIp.value.trim());
 document.getElementById('sov-close').onclick = closeSov;
 document.getElementById('sov-backdrop').onclick = closeSov;

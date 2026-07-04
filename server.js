@@ -431,12 +431,13 @@ app.get('/api/sovereignty', async (req, res) => {
     if (!t.web.length && !t.mail.length) {
       return res.status(404).json({ error: `could not resolve web or mail servers for ${host}` });
     }
-    // trace every distinct target once, in parallel
-    const ips = [...new Set([...t.web, ...t.mail].map((x) => x.ip))];
-    const traceByIp = new Map();
-    await Promise.all(ips.map(async (ip) => traceByIp.set(ip, await traceOnce(ip))));
-    const web = scoreCategory(t.web, t.web.map((x) => traceByIp.get(x.ip)));
-    const mail = scoreCategory(t.mail, t.mail.map((x) => traceByIp.get(x.ip)));
+    // trace the primary server of each category (the one that's scored)
+    const [webHops, mailHops] = await Promise.all([
+      t.web[0] ? traceOnce(t.web[0].ip).then((r) => r.hops) : Promise.resolve([]),
+      t.mail[0] ? traceOnce(t.mail[0].ip).then((r) => r.hops) : Promise.resolve([]),
+    ]);
+    const web = scoreCategory(serversWithGeo(t.web), webHops);
+    const mail = scoreCategory(serversWithGeo(t.mail), mailHops);
     res.json({ domain: host, mailDomain: t.mailDomain, web, mail });
   } catch {
     res.status(500).json({ error: 'scan failed' });
@@ -594,6 +595,7 @@ wss.on('connection', (ws) => {
     try { msg = JSON.parse(raw); } catch { return; }
     if (msg.type === 'mtr') startDistributed(ws, session, msg.ip, msg.vantages);
     else if (msg.type === 'mtr-stop') stopMtr(session);
+    else if (msg.type === 'sov') startSovScan(ws, session, msg.url);
   });
   ws.on('close', () => stopMtr(session));
 });
@@ -860,10 +862,11 @@ const EU_CC = new Set(['AT', 'BE', 'BG', 'HR', 'CY', 'CZ', 'DK', 'EE', 'FI', 'FR
 const SOV = { perCat: 3, inflight: 0, maxInflight: 4 }; // caps to bound fan-out / abuse
 
 // One bounded traceroute (no live loop). Returns located hops with geo.
+// No sub-second -i: mtr refuses interval < 1s for non-root users.
 function traceOnce(ip, { cycles = 3, maxHops = 30, timeoutMs = 12000 } = {}) {
   return new Promise((resolve) => {
     let proc;
-    try { proc = spawn('mtr', ['--json', '-n', '-i', '0.5', '-c', String(cycles), '-m', String(maxHops), '--', ip]); }
+    try { proc = spawn('mtr', ['--json', '-n', '-c', String(cycles), '-m', String(maxHops), '--', ip]); }
     catch { return resolve({ ip, hops: [], error: 'spawn failed' }); }
     let out = '';
     const kill = setTimeout(() => proc.kill('SIGKILL'), timeoutMs);
@@ -929,10 +932,9 @@ async function resolveWebMail(host) {
   return { host, mailDomain, web, mail };
 }
 
-// Score one category (web | mail) from its target IPs + their traces.
-// Hosting jurisdiction dominates (70%); transit route refines it (30%).
-function scoreCategory(targets, traces) {
-  const servers = targets.map((t) => {
+// Attach geo (country/city/AS + EU flag) to a list of resolved targets.
+function serversWithGeo(targets) {
+  return targets.map((t) => {
     const g = geoLookup(t.ip) || {};
     const cc = (g.cc || '').toUpperCase();
     return {
@@ -941,23 +943,29 @@ function scoreCategory(targets, traces) {
       as: g.asn ? `AS${g.asn}` : '', asName: g.org || '', eu: !!cc && EU_CC.has(cc),
     };
   });
+}
+
+// Score one category (web | mail) from its geo-tagged servers + the traced
+// route to the primary server. Hosting jurisdiction dominates (70%); transit
+// route refines it (30%).
+function scoreCategory(servers, hops) {
   const located = servers.filter((s) => s.cc);
   const serversFrac = located.length ? located.filter((s) => s.eu).length / located.length : null;
 
-  let hops = 0, hopsNonEu = 0; const asCc = new Map();
-  for (const tr of traces) for (const h of (tr && tr.hops) || []) {
+  let n = 0, hopsNonEu = 0; const asCc = new Map();
+  for (const h of hops || []) {
     const g = h.geo; if (!g || g.private) continue;
     const cc = (g.cc || '').toUpperCase(); if (!cc) continue;
-    hops++; if (!EU_CC.has(cc)) hopsNonEu++;
+    n++; if (!EU_CC.has(cc)) hopsNonEu++;
     if (g.asn && !asCc.has(g.asn)) asCc.set(g.asn, cc);
   }
   const nets = [...asCc.values()];
   const netsNonEu = nets.filter((cc) => !EU_CC.has(cc)).length;
-  const hopsNonEuFrac = hops ? hopsNonEu / hops : null;
+  const hopsNonEuFrac = n ? hopsNonEu / n : null;
   const netsNonEuFrac = nets.length ? netsNonEu / nets.length : null;
 
   let score = null;
-  if (serversFrac != null && hops > 0) {
+  if (serversFrac != null && n > 0) {
     const transit = 1 - 0.5 * hopsNonEuFrac - 0.5 * netsNonEuFrac;
     score = Math.round(100 * (0.7 * serversFrac + 0.3 * transit));
   } else if (serversFrac != null) {
@@ -966,12 +974,89 @@ function scoreCategory(targets, traces) {
   return {
     score,
     servers,
-    transit: hops ? {
-      hops, nets: nets.length,
+    transit: n ? {
+      hops: n, nets: nets.length,
       hopsNonEuPct: Math.round(100 * hopsNonEuFrac),
       netsNonEuPct: Math.round(100 * netsNonEuFrac),
     } : null,
   };
+}
+
+// Live traceroute (mtr --raw) that streams hops as they're discovered. Calls
+// onUpdate(hops[]) as hops/latencies arrive (throttled); resolves with the
+// final hop list. Raw lines: `h <hop> <ip>`, `p <hop> <rtt_usec> <seq>`.
+function traceStream(ip, onUpdate, { cycles = 3, maxHops = 30, timeoutMs = 15000 } = {}) {
+  return new Promise((resolve) => {
+    let proc;
+    // no sub-second -i: mtr refuses interval < 1s for non-root users
+    try { proc = spawn('mtr', ['--raw', '-n', '-c', String(cycles), '-m', String(maxHops), '--', ip]); }
+    catch { return resolve([]); }
+    const hops = new Map();           // hopIndex -> { idx, host, last }
+    let buf = '', settle = null, done = false;
+    const kill = setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* gone */ } }, timeoutMs);
+
+    const snapshot = () => [...hops.values()].sort((a, b) => a.idx - b.idx)
+      .map((h) => ({ idx: h.idx, host: h.host || null, last: h.last ?? null, geo: h.host ? geoLookup(h.host) : null }));
+    const flush = () => { settle = null; if (!done) onUpdate(snapshot()); };
+    const throttled = () => { if (!settle) settle = setTimeout(flush, 140); };
+
+    proc.stdout.on('data', (d) => {
+      buf += d;
+      const lines = buf.split('\n'); buf = lines.pop();
+      let changed = false;
+      for (const line of lines) {
+        const p = line.trim().split(/\s+/);
+        if (p.length < 3) continue;
+        const n = Number(p[1]);
+        if (!Number.isInteger(n) || n < 0 || n > maxHops) continue;
+        const cur = hops.get(n) || { idx: n + 1 };
+        if (p[0] === 'h' && cur.host !== p[2]) { cur.host = p[2]; hops.set(n, cur); changed = true; }
+        else if (p[0] === 'p') { const ms = Number(p[2]) / 1000; if (Number.isFinite(ms)) { cur.last = ms; hops.set(n, cur); changed = true; } }
+      }
+      if (changed) throttled();
+    });
+    proc.stderr.on('data', () => {});
+    const finish = () => {
+      if (done) return; done = true;
+      clearTimeout(kill); if (settle) clearTimeout(settle);
+      resolve(snapshot());
+    };
+    proc.on('error', finish);
+    proc.on('close', finish);
+  });
+}
+
+// Streamed sovereignty scan (over the browser WS): resolve → live hops per
+// primary route → final scores.
+async function startSovScan(ws, session, rawUrl) {
+  const sendMsg = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'sov', ...o })); };
+  const host = parseSiteHost(rawUrl);
+  if (!host) return sendMsg({ phase: 'error', error: 'enter a valid domain or URL' });
+  if (Date.now() - (session.lastSov || 0) < 1500) return; // cooldown
+  session.lastSov = Date.now();
+  if (SOV.inflight >= SOV.maxInflight) return sendMsg({ phase: 'error', error: 'busy — try again shortly' });
+  SOV.inflight++;
+  try {
+    const t = await resolveWebMail(host);
+    if (!t.web.length && !t.mail.length) return sendMsg({ phase: 'error', error: `could not resolve web or mail servers for ${host}` });
+    const webServers = serversWithGeo(t.web), mailServers = serversWithGeo(t.mail);
+    sendMsg({ phase: 'resolved', domain: host, mailDomain: t.mailDomain, web: webServers, mail: mailServers });
+
+    // trace the primary server of each category, streaming hops as they arrive
+    const [webHops, mailHops] = await Promise.all([
+      t.web[0] ? traceStream(t.web[0].ip, (hops) => sendMsg({ phase: 'trace', cat: 'web', hops })) : Promise.resolve([]),
+      t.mail[0] ? traceStream(t.mail[0].ip, (hops) => sendMsg({ phase: 'trace', cat: 'mail', hops })) : Promise.resolve([]),
+    ]);
+    sendMsg({
+      phase: 'done', domain: host, mailDomain: t.mailDomain,
+      web: t.web.length ? scoreCategory(webServers, webHops) : null,
+      mail: t.mail.length ? scoreCategory(mailServers, mailHops) : null,
+    });
+  } catch {
+    sendMsg({ phase: 'error', error: 'scan failed' });
+  } finally {
+    SOV.inflight--;
+  }
 }
 
 // ---------------------------------------------------------------------------

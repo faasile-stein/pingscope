@@ -323,24 +323,51 @@ body::after {
   min-width: 0; display: flex; flex-direction: column; gap: 8px; padding: 14px;
   background: rgba(12, 16, 30, 0.5); border: 1px solid rgba(120, 140, 200, 0.14); border-radius: 13px;
 }
-.sov-cat-h { font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.sov-cat-h { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 12px; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+.sov-open-mtr {
+  margin-left: auto; font-family: var(--mono); font-size: 9.5px; letter-spacing: .3px; text-transform: none;
+  color: var(--accent); background: rgba(74,216,255,.10); border: 1px solid rgba(74,216,255,.3);
+  border-radius: 999px; padding: 2px 8px; cursor: pointer; transition: .15s;
+}
+.sov-open-mtr:hover { color: #04121a; background: var(--accent); }
 .sov-score { font-family: var(--mono); font-size: 46px; font-weight: 800; line-height: 1; }
 .sov-score-max { font-size: 15px; font-weight: 600; color: var(--muted); margin-left: 3px; }
+.sov-scoring { font-family: var(--mono); font-size: 13px; color: var(--muted); height: 46px; display: flex; align-items: center; }
 .sov-badge2 {
   align-self: flex-start; font-family: var(--mono); font-size: 11px; text-transform: uppercase; letter-spacing: .5px;
   border: 1px solid currentColor; border-radius: 999px; padding: 2px 10px; opacity: .95;
 }
-.sov-srvs { display: flex; flex-direction: column; gap: 8px; margin-top: 3px; }
-.sov-srv { min-width: 0; display: flex; flex-direction: column; gap: 2px; font-family: var(--mono); font-size: 11px; }
+.sov-srvs { display: flex; flex-direction: column; gap: 6px; margin-top: 3px; }
+.sov-srv {
+  min-width: 0; width: 100%; display: flex; flex-direction: column; gap: 2px; text-align: left;
+  font-family: var(--mono); font-size: 11px; cursor: pointer;
+  background: rgba(120,150,220,.05); border: 1px solid transparent; border-radius: 8px; padding: 5px 8px; transition: .15s;
+}
+.sov-srv:hover { background: rgba(74,216,255,.09); border-color: rgba(74,216,255,.3); }
 .sov-srv-top { display: flex; align-items: baseline; gap: 6px; min-width: 0; }
 .sov-flag { flex: none; }
 .sov-srv-ip { color: var(--txt); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sov-srv-go { margin-left: auto; flex: none; font-size: 9px; color: var(--accent); opacity: 0; transition: .15s; }
+.sov-srv:hover .sov-srv-go { opacity: 1; }
 .sov-srv-sub { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
 .sov-srv-geo { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
 .sov-srv-as { margin-left: auto; flex: none; font-size: 10px; max-width: 50%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sov-srv-as.eu { color: var(--good); }
 .sov-srv-as.non { color: var(--bad); }
 .sov-empty { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 6px 0; }
+
+/* live hop stream */
+.sov-hops { display: flex; flex-direction: column; gap: 1px; margin-top: 4px; max-height: 168px; overflow-y: auto; }
+.sov-hops::-webkit-scrollbar { width: 6px; }
+.sov-hops::-webkit-scrollbar-thumb { background: rgba(120,150,220,.25); border-radius: 6px; }
+.sov-hop { display: flex; align-items: baseline; gap: 6px; font-family: var(--mono); font-size: 10.5px; line-height: 1.5; }
+.sov-hop-i { flex: none; color: var(--muted); width: 20px; text-align: right; opacity: .7; }
+.sov-hop-flag { flex: none; }
+.sov-hop-host { color: var(--txt); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.sov-hop-loc { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1 1 auto; }
+.sov-hop-rt { margin-left: auto; flex: none; color: var(--accent); }
+.sov-hop-wait { font-family: var(--mono); font-size: 11px; color: var(--muted); padding: 6px 0; opacity: .8; }
+
 .sov-transit { font-family: var(--mono); font-size: 10.5px; color: var(--muted); margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--panel-brd); }
 .sov-transit b { color: var(--txt); }
 .sov-dim { opacity: .7; }

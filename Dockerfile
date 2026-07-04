@@ -7,7 +7,7 @@ RUN node -v && npm -v
 # Network tools used by the measurement engine (+ curl/ca-certs/gzip to fetch
 # the offline geo databases at build time).
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends iputils-ping traceroute mtr-tiny fping libcap2-bin curl ca-certificates gzip \
+    && apt-get install -y --no-install-recommends iputils-ping traceroute mtr-tiny fping libcap2-bin curl ca-certificates gzip fonts-dejavu-core \
     && rm -rf /var/lib/apt/lists/*
 
 # Strip cap_net_raw from the ping binary. Debian ships ping with `cap_net_raw+ep`,

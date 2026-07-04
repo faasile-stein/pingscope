@@ -39,8 +39,11 @@ function catHtml(title, icon, cat, emptyMsg) {
   const transit = cat.transit
     ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks non-sovereign`
     : '<span class="dim">route not measured (target blocks traceroute)</span>';
+  // "visualize" opens the live MTR on a map (geographic view) in the main app
+  const primaryIp = (cat.servers && cat.servers[0] && cat.servers[0].ip) || '';
+  const viz = primaryIp ? `<a class="viz-pill" href="/?mtr=${encodeURIComponent(primaryIp)}&view=geo" target="_blank" rel="noopener" title="trace this route on a world map">▸ visualize</a>` : '';
   return `<div class="cat">
-    <div class="cat-h">${icon} ${title}</div>
+    <div class="cat-h">${icon} ${title}${viz}</div>
     <div class="score" style="color:${color}">${cat.score == null ? '—' : cat.score}<small>/100</small></div>
     <div class="badge" style="color:${color};border-color:${color}">${sovLabel(cat.score)}</div>
     ${servers}
@@ -58,14 +61,25 @@ async function check(input) {
     const res = await fetch('/api/sovereignty?url=' + encodeURIComponent(q));
     const data = await res.json();
     if (!res.ok) { resultEl.innerHTML = `<div class="r-error">${esc(data.error || 'scan failed')}</div>`; return; }
+    const web = data.web && data.web.score, mail = data.mail && data.mail.score;
+    // shareable link carries the scores so the crawler's card needs no re-scan
+    const share = `${location.origin}/sovereignty?d=${encodeURIComponent(data.domain)}` +
+      (web != null ? `&w=${web}` : '') + (mail != null ? `&m=${mail}` : '');
     resultEl.innerHTML =
       `<div class="r-domain">results for <b>${esc(data.domain)}</b>${data.mailDomain && data.mailDomain !== data.domain ? ` · mail on <b>${esc(data.mailDomain)}</b>` : ''}</div>` +
       '<div class="cats">' +
       catHtml('Web', '🌐', data.web, 'no web servers found') +
       catHtml('Mail', '✉️', data.mail, `no mail servers (no MX record for ${data.mailDomain || data.domain})`) +
-      '</div>';
-    // reflect in the URL so the check is shareable
-    try { history.replaceState(null, '', '?d=' + encodeURIComponent(data.domain)); } catch { /* ignore */ }
+      '</div>' +
+      `<div class="share-row"><button class="share-btn" data-share="${esc(share)}">🔗 Share this result</button><span class="share-hint">a preview card with these scores</span></div>`;
+    resultEl.querySelector('.share-btn').onclick = (e) => {
+      const btn = e.currentTarget;
+      navigator.clipboard.writeText(btn.dataset.share).then(() => {
+        btn.textContent = '✓ link copied'; setTimeout(() => { btn.textContent = '🔗 Share this result'; }, 1800);
+      }).catch(() => { btn.textContent = btn.dataset.share; });
+    };
+    // reflect scores in the URL so the current page is itself shareable
+    try { history.replaceState(null, '', share.slice(location.origin.length)); } catch { /* ignore */ }
   } catch {
     resultEl.innerHTML = '<div class="r-error">scan failed — network error</div>';
   } finally {

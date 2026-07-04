@@ -12,6 +12,7 @@ const { WebSocketServer } = require('ws');
 const { DatabaseSync } = require('node:sqlite');
 const maxmind = require('maxmind');
 const helmet = require('helmet');
+const { Resvg } = require('@resvg/resvg-js');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -420,10 +421,92 @@ app.get('/og', (req, res) => {
   res.type('image/svg+xml').set('Cache-Control', 'public, max-age=3600').send(svg);
 });
 
-// Standalone European-sovereignty explainer + checker page.
-app.get('/sovereignty', (_req, res) => {
+// ---- sovereignty share: per-domain OG image + tag injection ----
+const SOV_HTML = fs.readFileSync(path.join(__dirname, 'public', 'sovereignty.html'), 'utf8');
+const SOV_FONT = { fontDirs: ['/usr/share/fonts'], loadSystemFonts: true, defaultFontFamily: 'DejaVu Sans' };
+const clampScore = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : null; };
+const sovScoreColor = (s) => {
+  if (s == null) return '#8f9bc4';
+  const p = (100 - s) / 100;
+  return `rgb(${[54 + (255 - 54) * p, 241 + (93 - 241) * p, 163 + (108 - 163) * p].map(Math.round).join(',')})`;
+};
+const sovVerdict = (s) => (s == null ? 'no mail' : s >= 80 ? 'sovereign' : s >= 50 ? 'partial' : 'non-sovereign');
+
+// 1200×630 share card: "European sovereignty check of <domain>" + web/mail scores.
+function sovOgSvg({ domain, web, mail }) {
+  let dRaw = String(domain || 'a domain');
+  if (dRaw.length > 34) dRaw = dRaw.slice(0, 33) + '…';
+  const d = xmlEsc(dRaw);
+  const dSize = dRaw.length <= 14 ? 70 : dRaw.length <= 22 ? 56 : dRaw.length <= 28 ? 46 : 38;
+  const F = 'DejaVu Sans', M = 'DejaVu Sans Mono';
+  const tile = (x, label, score) => {
+    const col = sovScoreColor(score), v = sovVerdict(score);
+    return `
+    <text x="${x + 26}" y="474" font-family="${M}" font-size="15" letter-spacing="2" fill="#8f9bc4">${label}</text>
+    <text x="${x + 24}" y="536" font-family="${M}" font-size="60" font-weight="bold" fill="${col}">${score == null ? '—' : score}<tspan font-size="19" fill="#8f9bc4"> /100</tspan></text>
+    <rect x="${x + 25}" y="552" width="${(v.length * 8.6) + 22}" height="27" rx="13.5" fill="none" stroke="${col}"/>
+    <text x="${x + 36}" y="570" font-family="${M}" font-size="14" fill="${col}">${v}</text>`;
+  };
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="g1" cx="12%" cy="-10%" r="70%"><stop offset="0" stop-color="#4ad8ff" stop-opacity="0.18"/><stop offset="1" stop-color="#4ad8ff" stop-opacity="0"/></radialGradient>
+    <radialGradient id="g2" cx="110%" cy="120%" r="80%"><stop offset="0" stop-color="#b78bff" stop-opacity="0.22"/><stop offset="1" stop-color="#b78bff" stop-opacity="0"/></radialGradient>
+    <linearGradient id="grad" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4ad8ff"/><stop offset="1" stop-color="#b78bff"/></linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="#05060c"/>
+  <rect width="1200" height="630" fill="url(#g1)"/><rect width="1200" height="630" fill="url(#g2)"/>
+  <g transform="translate(64,52)"><circle cx="17" cy="17" r="15" fill="none" stroke="#4ad8ff" stroke-width="3.5"/><path d="M17 17 L17 32 A15 15 0 0 1 2 17 Z" fill="#4ad8ff"/></g>
+  <text x="112" y="78" font-family="${F}" font-size="22" font-weight="bold" letter-spacing="6" fill="#e7ecff">PINGSCOPE</text>
+  <rect x="905" y="52" width="231" height="38" rx="19" fill="rgba(183,139,255,0.08)" stroke="#b78bff" stroke-opacity="0.4"/>
+  <text x="932" y="77" font-family="${M}" font-size="17" fill="#b78bff">sovereignty check</text>
+  <text x="64" y="248" font-family="${M}" font-size="20" letter-spacing="5" fill="#8f9bc4">EUROPEAN SOVEREIGNTY CHECK OF</text>
+  <text x="62" y="324" font-family="${F}" font-size="${dSize}" font-weight="800" fill="url(#grad)">${d}</text>
+  <text x="64" y="404" font-family="${F}" font-size="25" fill="#c3ccea">Where its web &amp; mail are hosted — and who controls them.</text>
+  <rect x="662" y="430" width="474" height="164" rx="20" fill="rgba(12,16,30,0.82)" stroke="rgba(120,150,220,0.24)"/>
+  <line x1="899" y1="452" x2="899" y2="572" stroke="rgba(120,150,220,0.18)"/>
+  ${tile(662, 'WEB', web)}${tile(899, 'MAIL', mail)}
+  <text x="64" y="560" font-family="${M}" font-size="23" font-weight="bold" fill="#4ad8ff">pingscope.net/sovereignty</text>
+</svg>`;
+}
+
+// Per-domain share image (PNG). Scores come from the URL — no scan at crawl time.
+app.get('/og/sovereignty', (req, res) => {
+  const domain = cleanTarget(req.query.d) || 'a domain';
+  const svg = sovOgSvg({ domain, web: clampScore(req.query.web), mail: clampScore(req.query.mail) });
+  try {
+    const png = new Resvg(svg, { fitTo: { mode: 'width', value: 1200 }, font: SOV_FONT }).render().asPng();
+    res.type('image/png').set('Cache-Control', 'public, max-age=86400').send(png);
+  } catch (e) {
+    res.status(500).type('text/plain').send('render failed');
+  }
+});
+
+// Standalone sovereignty page — injects per-domain OG tags when shared with ?d.
+app.get('/sovereignty', (req, res) => {
+  const base = `${req.protocol}://${req.get('host')}`;
+  const d = cleanTarget(req.query.d);
+  let tags;
+  if (d) {
+    const web = clampScore(req.query.w), mail = clampScore(req.query.m);
+    const q = `d=${encodeURIComponent(d)}${web != null ? `&web=${web}` : ''}${mail != null ? `&mail=${mail}` : ''}`;
+    const shareQ = `d=${encodeURIComponent(d)}${web != null ? `&w=${web}` : ''}${mail != null ? `&m=${mail}` : ''}`;
+    const fmt = (s) => (s != null ? `${s}/100` : '—');
+    tags = ogTags({
+      title: `European sovereignty check of ${d}`,
+      desc: `${d} — web ${fmt(web)} · mail ${fmt(mail)}. See where a site's web & mail are hosted, and who ultimately controls them.`,
+      image: `${base}/og/sovereignty?${q}`,
+      url: `${base}/sovereignty?${shareQ}`,
+    });
+  } else {
+    tags = ogTags({
+      title: 'Is your website actually European?',
+      desc: "Run any domain through the European sovereignty check: where its web & mail really live, and who ultimately controls them.",
+      image: `${base}/og-sovereignty.png`,
+      url: `${base}/sovereignty`,
+    });
+  }
   res.set('Cache-Control', 'no-store');
-  res.type('html').sendFile(path.join(__dirname, 'public', 'sovereignty.html'));
+  res.type('html').send(SOV_HTML.replace('<!--SOVOG-->', tags));
 });
 
 app.use(express.static(path.join(__dirname, 'public')));
@@ -436,6 +519,9 @@ app.get('/api/targets', (_req, res) => res.json(PROBES)); // back-compat
 app.get('/api/sovereignty', async (req, res) => {
   const host = parseSiteHost(req.query.url || req.query.domain);
   if (!host) return res.status(400).json({ error: 'enter a valid domain or URL' });
+  logQuery('sov', host, clientIp(req));
+  const wait = rateLimit(clientIp(req));
+  if (wait) return res.status(429).set('Retry-After', String(wait)).json({ error: `rate limited — one check per ${RATE_MS / 1000}s (try again in ${wait}s)` });
   if (SOV.inflight >= SOV.maxInflight) return res.status(429).json({ error: 'busy — try again shortly' });
   SOV.inflight++;
   try {
@@ -586,7 +672,37 @@ ass.on('connection', (ws, req) => {
   ws.on('error', () => {});
 });
 
-wss.on('connection', (ws) => {
+// Per-user (IP) rate limit: at most one trace OR sovereignty check per 20s.
+const RATE_MS = Number(process.env.RATE_MS || 20_000);
+const lastActionByIp = new Map();
+// The edge sets `X-Forwarded-For: <client-ip>, <edge-vrack-ip>`, so the real
+// client is the FIRST (leftmost) entry — that's the one we rate-limit on.
+function clientIp(req) {
+  const xff = (req && req.headers && req.headers['x-forwarded-for']) || '';
+  return xff.split(',')[0].trim() || (req && req.socket && req.socket.remoteAddress) || 'unknown';
+}
+// 0 = allowed (records the hit); otherwise the seconds until the next allowed action.
+function rateLimit(ip) {
+  const now = Date.now();
+  const last = lastActionByIp.get(ip) || 0;
+  if (now - last < RATE_MS) return Math.ceil((RATE_MS - (now - last)) / 1000);
+  lastActionByIp.set(ip, now);
+  if (lastActionByIp.size > 5000) for (const [k, t] of lastActionByIp) if (now - t > RATE_MS) lastActionByIp.delete(k);
+  return 0;
+}
+
+// Access log of user-entered targets (MTR traces + sovereignty checks). Written
+// to stdout AND appended to a TSV on the data volume so it survives restarts.
+// `kind` is 'sov' or 'mtr'.
+const QUERY_LOG = path.join(path.dirname(DB_PATH), 'queries.log');
+function logQuery(kind, value, ip) {
+  const line = `${new Date().toISOString()}\t${kind}\t${ip || '-'}\t${String(value).slice(0, 100)}`;
+  console.log(`[query] ${line}`);
+  fs.appendFile(QUERY_LOG, line + '\n', () => { /* best-effort */ });
+}
+
+wss.on('connection', (ws, req) => {
+  const ip = clientIp(req);
   // Send the catalog + default selection + current agent list. Replay recent
   // history only for the preselected probes (sending all would be heavy).
   const preHistory = {};
@@ -601,7 +717,7 @@ wss.on('connection', (ws) => {
     origin: ORIGIN,
   }));
 
-  const session = { mtr: null, reqs: new Set(), lastMtr: 0 };
+  const session = { mtr: null, reqs: new Set(), lastMtr: 0, ip };
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
@@ -794,6 +910,7 @@ async function startDistributed(ws, session, rawTarget, vantages) {
   if (!isValidHost(rawTarget)) {
     return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: `refused: "${String(rawTarget).slice(0, 64)}"` }));
   }
+  logQuery('mtr', rawTarget, session.ip);
   // resolve to a public IP (v4 or v6) — agents require an IP and must never hit
   // private space. Hostnames prefer IPv4 for reachability, falling back to AAAA.
   let ip = rawTarget;
@@ -803,6 +920,10 @@ async function startDistributed(ws, session, rawTarget, vantages) {
   }
   if (!isPublicIp(ip)) {
     return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'target must be a public IP' }));
+  }
+  const wait = rateLimit(session.ip);
+  if (wait) {
+    return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: `rate limited — one trace/check per ${RATE_MS / 1000}s (try again in ${wait}s)` }));
   }
 
   startMtr(ws, ip, session, 'local');
@@ -948,11 +1069,32 @@ function parseSiteHost(input) {
   return isValidHost(s) ? s : null;
 }
 
+// Common two-label public suffixes — for these the registrable domain is the
+// last THREE labels (e.g. bbc.co.uk), otherwise the last two (example.com).
+const TWO_LABEL_TLDS = new Set([
+  'co.uk', 'org.uk', 'gov.uk', 'ac.uk', 'me.uk', 'ltd.uk', 'plc.uk', 'net.uk', 'sch.uk',
+  'com.au', 'net.au', 'org.au', 'edu.au', 'gov.au', 'id.au',
+  'co.nz', 'net.nz', 'org.nz', 'govt.nz', 'ac.nz',
+  'co.za', 'org.za', 'com.br', 'com.cn', 'com.mx', 'com.tr', 'com.sg', 'com.hk',
+  'com.tw', 'com.ua', 'com.pl', 'com.ar', 'com.co',
+  'co.jp', 'or.jp', 'ne.jp', 'go.jp', 'ac.jp',
+  'co.in', 'co.kr', 'co.il', 'co.id', 'co.th',
+]);
+
+// Registrable apex of a hostname (strips sub-domains; MX lives on the apex).
+function apexOf(host) {
+  if (net.isIP(host)) return host;
+  const p = String(host).split('.').filter(Boolean);
+  if (p.length <= 2) return p.join('.');
+  return TWO_LABEL_TLDS.has(p.slice(-2).join('.')) ? p.slice(-3).join('.') : p.slice(-2).join('.');
+}
+
 // Resolve a site's web endpoints (A/AAAA of the host) and mail endpoints (each
-// MX's A/AAAA, by priority). Only public IPs are kept; counts are capped.
+// MX's A/AAAA, by priority) — MX is looked up on the apex domain only. Only
+// public IPs are kept; counts are capped.
 async function resolveWebMail(host) {
   const isIp = !!net.isIP(host);
-  const mailDomain = host.replace(/^www\./, '');
+  const mailDomain = apexOf(host);
 
   const ipsOf = async (name) => {
     if (net.isIP(name)) return [name];
@@ -1085,8 +1227,9 @@ async function startSovScan(ws, session, rawUrl) {
   const sendMsg = (o) => { if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'sov', ...o })); };
   const host = parseSiteHost(rawUrl);
   if (!host) return sendMsg({ phase: 'error', error: 'enter a valid domain or URL' });
-  if (Date.now() - (session.lastSov || 0) < 1500) return; // cooldown
-  session.lastSov = Date.now();
+  logQuery('sov', host, session.ip);
+  const wait = rateLimit(session.ip);
+  if (wait) return sendMsg({ phase: 'error', error: `rate limited — one trace/check per ${RATE_MS / 1000}s (try again in ${wait}s)` });
   if (SOV.inflight >= SOV.maxInflight) return sendMsg({ phase: 'error', error: 'busy — try again shortly' });
   SOV.inflight++;
   try {

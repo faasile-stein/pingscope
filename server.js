@@ -358,6 +358,73 @@ function recoverCorruptRanking() {
 }
 recoverCorruptRanking();
 
+// Best-effort BACKGROUND salvage of ping history (`samples`) from a set-aside
+// *.imported-* file (that's the corrupt table, so it's tolerant to damage:
+// reads recent→older in rowid chunks, skips ranges that error, only keeps rows
+// inside the retention window, throttles between chunks so it never blocks the
+// health check, and renames the file when done so it runs once). Fire-and-
+// forget from main() AFTER the server is listening.
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+async function salvageSamples() {
+  let files;
+  try {
+    const dir = path.dirname(DB_PATH), base = path.basename(DB_PATH);
+    files = fs.readdirSync(dir)
+      .filter((f) => f.startsWith(base + '.imported-') && !f.endsWith('-wal') && !f.endsWith('-shm'))
+      .map((f) => path.join(dir, f));
+  } catch { return; }
+  for (const imported of files) {
+    const claim = imported.replace('.imported-', '.samples-src-'); // claim so a restart won't reprocess
+    try { fs.renameSync(imported, claim); } catch { continue; }
+    let src;
+    try { src = new DatabaseSync(claim); } catch (e) { console.warn('  db: samples salvage — open failed:', e.message); continue; }
+    let maxRowid = 0;
+    try { maxRowid = (src.prepare('SELECT max(rowid) m FROM samples').get() || {}).m || 0; } catch { maxRowid = 0; }
+
+    const cutoff = Date.now() - RETENTION_DAYS * 86400_000;
+    const CHUNK = 8000, THROTTLE = 50, DEADLINE = Date.now() + 30 * 60_000;
+    const sel = src.prepare('SELECT target_id,t,loss,sent,recv,min,max,median,p25,p75,avg FROM samples WHERE rowid >= ? AND rowid < ?');
+    const stats = { recovered: 0, skipped: 0 };
+    // insert one chunk's in-window rows in a single transaction; returns kept count
+    const insertBatch = (rows) => {
+      const batch = rows.filter((r) => r.t >= cutoff);
+      if (!batch.length) return 0;
+      try {
+        db.exec('BEGIN');
+        for (const r of batch) insertStmt.run(r.target_id, r.t, r.loss, r.sent, r.recv, r.min, r.max, r.median, r.p25, r.p75, r.avg);
+        db.exec('COMMIT');
+        stats.recovered += batch.length;
+      } catch { try { db.exec('ROLLBACK'); } catch { /* ignore */ } }
+      return batch.length;
+    };
+    console.log(`  db: salvaging ping history from ${path.basename(claim)} (maxRowid≈${maxRowid || 'unknown'})…`);
+
+    if (maxRowid > 0) {
+      // known top: walk recent → older, stop once whole chunks fall below retention
+      let belowStreak = 0;
+      for (let hi = maxRowid + 1; hi > 0 && Date.now() < DEADLINE; hi -= CHUNK) {
+        let rows;
+        try { rows = sel.all(Math.max(0, hi - CHUNK), hi); } catch { stats.skipped += CHUNK; continue; }
+        if (rows.length) { belowStreak = insertBatch(rows) ? 0 : belowStreak + 1; if (belowStreak >= 3) break; }
+        await sleep(THROTTLE);
+      }
+    } else {
+      // unknown top: forward scan, stop after a run of empty chunks
+      let emptyStreak = 0;
+      for (let lo = 0; Date.now() < DEADLINE; lo += CHUNK) {
+        let rows;
+        try { rows = sel.all(lo, lo + CHUNK); } catch { stats.skipped += CHUNK; emptyStreak = 0; continue; }
+        if (!rows.length) { if (++emptyStreak >= 8) break; await sleep(THROTTLE); continue; }
+        emptyStreak = 0; insertBatch(rows);
+        await sleep(THROTTLE);
+      }
+    }
+    try { src.close(); } catch { /* ignore */ }
+    try { fs.renameSync(claim, claim.replace('.samples-src-', '.samples-done-')); } catch { /* ignore */ }
+    console.log(`  db: ping-history salvage done — recovered ${stats.recovered} row(s), skipped ~${stats.skipped} corrupt rowid(s)`);
+  }
+}
+
 function persist(r) {
   insertStmt.run(r.targetId, r.t, r.loss, r.sent, r.recv, r.min, r.max, r.median, r.p25, r.p75, r.avg);
 }
@@ -1416,6 +1483,9 @@ async function main() {
     console.log(`  Catalog: ${PROBES.length} probes (dns=${byType('dns')} isp=${byType('isp')} cloud=${byType('cloud')}) · ${PRESELECTED.length} preselected`);
     console.log(`  Community agents: ${AGENT_TOKEN ? 'ENABLED (token set)' : 'disabled — set AGENT_TOKEN to allow agents'}`);
     console.log('');
+    // Best-effort ping-history salvage — background, well after the health check
+    // is green, and never fatal.
+    setTimeout(() => { salvageSamples().catch((e) => console.warn('  db: samples salvage error —', e.message)); }, 15_000);
   });
 }
 main().catch((e) => { console.error('startup failed:', e); process.exit(1); });

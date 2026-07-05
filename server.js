@@ -370,12 +370,17 @@ async function salvageSamples() {
   try {
     const dir = path.dirname(DB_PATH), base = path.basename(DB_PATH);
     files = fs.readdirSync(dir)
-      .filter((f) => f.startsWith(base + '.imported-') && !f.endsWith('-wal') && !f.endsWith('-shm'))
+      .filter((f) => (f.startsWith(base + '.imported-') || f.startsWith(base + '.samples-src-')) && !f.endsWith('-wal') && !f.endsWith('-shm'))
       .map((f) => path.join(dir, f));
   } catch { return; }
-  for (const imported of files) {
-    const claim = imported.replace('.imported-', '.samples-src-'); // claim so a restart won't reprocess
-    try { fs.renameSync(imported, claim); } catch { continue; }
+  for (const file of files) {
+    // claim *.imported-* by renaming so a restart won't reprocess it; a
+    // *.samples-src-* file is an interrupted run being resumed.
+    let claim = file;
+    if (file.includes('.imported-')) {
+      claim = file.replace('.imported-', '.samples-src-');
+      try { fs.renameSync(file, claim); } catch { continue; }
+    }
     let src;
     try { src = new DatabaseSync(claim); } catch (e) { console.warn('  db: samples salvage — open failed:', e.message); continue; }
     let maxRowid = 0;
@@ -1483,9 +1488,12 @@ async function main() {
     console.log(`  Catalog: ${PROBES.length} probes (dns=${byType('dns')} isp=${byType('isp')} cloud=${byType('cloud')}) · ${PRESELECTED.length} preselected`);
     console.log(`  Community agents: ${AGENT_TOKEN ? 'ENABLED (token set)' : 'disabled — set AGENT_TOKEN to allow agents'}`);
     console.log('');
-    // Best-effort ping-history salvage — background, well after the health check
-    // is green, and never fatal.
-    setTimeout(() => { salvageSamples().catch((e) => console.warn('  db: samples salvage error —', e.message)); }, 15_000);
+    // Opt-in ping-history salvage (RECOVER_SAMPLES=1). It reads a 1GB+ corrupt
+    // file and can saturate a small instance, so it is OFF by default and must
+    // be enabled deliberately (ideally on a temporarily larger instance).
+    if (process.env.RECOVER_SAMPLES === '1') {
+      setTimeout(() => { salvageSamples().catch((e) => console.warn('  db: samples salvage error —', e.message)); }, 15_000);
+    }
   });
 }
 main().catch((e) => { console.error('startup failed:', e); process.exit(1); });

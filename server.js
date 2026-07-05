@@ -253,8 +253,37 @@ function toSample(probe, r, t) {
 // Persistent store (SQLite)
 // ---------------------------------------------------------------------------
 fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-const db = new DatabaseSync(DB_PATH);
-db.exec('PRAGMA journal_mode = WAL;');
+
+// Open the DB and verify it isn't corrupt. A malformed image (e.g. from a
+// container killed mid-write during a redeploy) would otherwise crash the
+// process at boot and take the whole site down. On failure we move the bad
+// files aside and start fresh — both tables here (ping history + the
+// sovereignty ranking) are regenerable, so a reset restores service.
+let db;
+function openDatabase(pathToDb) {
+  const d = new DatabaseSync(pathToDb);
+  d.exec('PRAGMA journal_mode = WAL;');
+  const row = d.prepare('PRAGMA quick_check').get();
+  if (!row || String(row.quick_check).toLowerCase() !== 'ok') {
+    throw new Error(`quick_check → ${row ? row.quick_check : 'no result'}`);
+  }
+  return d;
+}
+try {
+  db = openDatabase(DB_PATH);
+} catch (e) {
+  console.error(`  db: existing database is corrupt/unreadable (${e.message}) — resetting`);
+  try { db && db.close(); } catch { /* ignore */ }
+  const stamp = Date.now();
+  for (const suffix of ['', '-wal', '-shm']) {
+    try {
+      if (fs.existsSync(DB_PATH + suffix)) fs.renameSync(DB_PATH + suffix, `${DB_PATH}.corrupt-${stamp}${suffix}`);
+    } catch { /* ignore */ }
+  }
+  db = new DatabaseSync(DB_PATH);          // fresh, empty database
+  db.exec('PRAGMA journal_mode = WAL;');
+  console.warn(`  db: started a fresh database (old one saved as ${DB_PATH}.corrupt-${stamp})`);
+}
 db.exec(`
   CREATE TABLE IF NOT EXISTS samples (
     target_id TEXT NOT NULL,
@@ -294,6 +323,41 @@ const sovUpsertStmt = db.prepare(`
 const sovSeedStmt = db.prepare('SELECT domain, data, at FROM sov_scores');
 const sovRankStmt = db.prepare('SELECT domain, web, mail, at FROM sov_scores');
 
+// If a previous database was set aside as *.corrupt-* (see the boot self-heal
+// above), try to salvage its sovereignty ranking into the live DB. The
+// corruption is typically in the large `samples` tree, so a targeted read of
+// the small `sov_scores` tree usually still succeeds. Runs once; the file is
+// renamed afterwards so it isn't re-imported.
+function recoverCorruptRanking() {
+  let files;
+  try {
+    const dir = path.dirname(DB_PATH), base = path.basename(DB_PATH);
+    files = fs.readdirSync(dir)
+      .filter((f) => f.startsWith(base + '.corrupt-') && !f.endsWith('-wal') && !f.endsWith('-shm'))
+      .sort()
+      .map((f) => path.join(dir, f));
+  } catch { return; }
+  for (const src of files) {
+    let rows = [];
+    try {
+      const cdb = new DatabaseSync(src);
+      rows = cdb.prepare('SELECT domain, web, mail, data, at FROM sov_scores').all();
+      cdb.close();
+    } catch (e) {
+      console.warn(`  db: could not salvage ranking from ${path.basename(src)} — ${e.message}`);
+      try { fs.renameSync(src, src.replace('.corrupt-', '.unrecovered-')); } catch { /* ignore */ }
+      continue;
+    }
+    let n = 0;
+    for (const r of rows) {
+      try { sovUpsertStmt.run({ domain: r.domain, web: r.web, mail: r.mail, data: r.data, at: r.at }); n++; } catch { /* skip bad row */ }
+    }
+    console.log(`  db: recovered ${n} sovereignty score(s) from ${path.basename(src)}`);
+    try { fs.renameSync(src, src.replace('.corrupt-', '.imported-')); } catch { /* ignore */ }
+  }
+}
+recoverCorruptRanking();
+
 function persist(r) {
   insertStmt.run(r.targetId, r.t, r.loss, r.sent, r.recv, r.min, r.max, r.median, r.p25, r.p75, r.avg);
 }
@@ -306,10 +370,14 @@ function rowToSample(row) {
   };
 }
 
-// prune anything older than the retention window
+// prune anything older than the retention window (never fatal)
 function prune() {
-  const cutoff = Date.now() - RETENTION_DAYS * 86400_000;
-  db.prepare('DELETE FROM samples WHERE t < ?').run(cutoff);
+  try {
+    const cutoff = Date.now() - RETENTION_DAYS * 86400_000;
+    db.prepare('DELETE FROM samples WHERE t < ?').run(cutoff);
+  } catch (e) {
+    console.warn('  db: prune failed —', e.message);
+  }
 }
 prune();
 setInterval(prune, 3600_000);

@@ -4,8 +4,19 @@ const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
-const dns = require('dns').promises;
+const dnsBase = require('dns');
+const dns = dnsBase.promises;
 const net = require('net');
+
+// Resolve through reliable public resolvers instead of the platform-assigned
+// one: a Firecracker microVM's resolver can go away (as it did on 2026-07-06),
+// which otherwise breaks ALL DNS — probes, sovereignty checks and MTR. This
+// routes every c-ares query (resolve4/6/Mx/reverse, and lookupHost below) to
+// these servers over UDP/TCP 53, which egress allows. Overridable via env.
+const DNS_SERVERS = (process.env.DNS_SERVERS || '1.1.1.1,8.8.8.8,1.0.0.1')
+  .split(',').map((s) => s.trim()).filter(Boolean);
+try { dnsBase.setServers(DNS_SERVERS); console.log('  dns: resolvers →', DNS_SERVERS.join(', ')); }
+catch (e) { console.warn('  dns: setServers failed —', e.message); }
 const crypto = require('crypto');
 const { spawn } = require('child_process');
 const { WebSocketServer } = require('ws');
@@ -40,8 +51,12 @@ const HISTORY = 600;           // seconds of history replayed to a fresh client
 // Resolve a hostname to an address, preferring IPv4 (broadest reachability, and
 // community agents may lack IPv6) but falling back to IPv6-only hosts.
 async function lookupHost(host) {
-  try { return await dns.lookup(host, { family: 4 }); }
-  catch { return await dns.lookup(host, { family: 6 }); }
+  // c-ares (resolve4/6) rather than dns.lookup so it uses DNS_SERVERS, not the
+  // OS resolver (which may be the dead platform one).
+  try { const a = await dns.resolve4(host); if (a && a.length) return { address: a[0], family: 4 }; } catch { /* try IPv6 */ }
+  const aaaa = await dns.resolve6(host);
+  if (aaaa && aaaa.length) return { address: aaaa[0], family: 6 };
+  throw new Error('no A/AAAA record');
 }
 
 // Public unicast IPv4? (rejects this-net, private, loopback, CGNAT, link-local,

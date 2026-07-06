@@ -17,24 +17,42 @@ const ago = (ts) => {
 };
 const cell = (v) => v == null ? '<span class="sc dash">—</span>' : `<span class="sc" style="color:${sovColor(v)}">${v}</span>`;
 
-async function load() {
-  const body = document.getElementById('rank-body');
-  const state = document.getElementById('rank-state');
-  const count = document.getElementById('rank-count');
+const PER = 100;
+const body = () => document.getElementById('rank-body');
+const state = () => document.getElementById('rank-state');
+const countEl = () => document.getElementById('rank-count');
+const pagerEl = () => document.getElementById('rank-pager');
+
+function renderPager(d) {
+  if (!d || d.pages <= 1) { pagerEl().innerHTML = ''; return; }
+  pagerEl().innerHTML =
+    `<button class="pg" ${d.page <= 1 ? 'disabled' : ''} data-page="${d.page - 1}">← prev</button>` +
+    `<span class="pg-info">page ${d.page.toLocaleString()} of ${d.pages.toLocaleString()}</span>` +
+    `<button class="pg" ${d.page >= d.pages ? 'disabled' : ''} data-page="${d.page + 1}">next →</button>`;
+  pagerEl().querySelectorAll('button[data-page]').forEach((b) => {
+    b.onclick = () => { if (!b.disabled) load(Number(b.dataset.page)); };
+  });
+}
+
+async function load(page) {
+  page = page || Number(new URLSearchParams(location.search).get('page')) || 1;
+  state().innerHTML = '';
   try {
-    const res = await fetch('/api/rankings');
+    const res = await fetch(`/api/rankings?page=${page}&per=${PER}`);
     const data = await res.json();
     const rows = data.rankings || [];
-    if (!rows.length) {
-      count.textContent = 'no domains checked yet';
-      state.innerHTML = '<div class="state">Nothing here yet. <a href="/sovereignty">Run the first sovereignty check →</a></div>';
+    if (!data.total) {
+      countEl().textContent = 'no domains checked yet';
+      state().innerHTML = '<div class="state">Nothing here yet. <a href="/sovereignty">Run the first sovereignty check →</a></div>';
+      body().innerHTML = ''; pagerEl().innerHTML = '';
       return;
     }
-    count.textContent = `${rows.length} domain${rows.length === 1 ? '' : 's'} checked · ranked most → least sovereign`;
-    body.innerHTML = rows.map((r, i) => {
+    const from = (data.page - 1) * data.per + 1, to = (data.page - 1) * data.per + rows.length;
+    countEl().textContent = `${data.total.toLocaleString()} domains checked · ranked most → least sovereign · showing ${from.toLocaleString()}–${to.toLocaleString()}`;
+    body().innerHTML = rows.map((r) => {
       const href = '/sovereignty?d=' + encodeURIComponent(r.domain);
       return `<tr>
-        <td class="rank">${i + 1}</td>
+        <td class="rank">${r.rank}</td>
         <td class="dom"><a href="${esc(href)}">${esc(r.domain)}</a></td>
         <td>${cell(r.web)}</td>
         <td>${cell(r.mail)}</td>
@@ -42,9 +60,12 @@ async function load() {
         <td class="go"><a href="${esc(href)}" title="open the full check">→</a></td>
       </tr>`;
     }).join('');
+    renderPager(data);
+    try { history.replaceState(null, '', data.page > 1 ? `?page=${data.page}` : location.pathname); } catch { /* ignore */ }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch {
-    count.textContent = '';
-    state.innerHTML = '<div class="state">Couldn\'t load the ranking. <a href="/ranking">Retry</a></div>';
+    countEl().textContent = '';
+    state().innerHTML = '<div class="state">Couldn\'t load the ranking. <a href="/ranking">Retry</a></div>';
   }
 }
 load();

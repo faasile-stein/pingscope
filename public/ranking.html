@@ -65,6 +65,13 @@
     td.go a:hover { color: var(--accent); }
     .state { padding: 40px 0; text-align: center; font: 500 14px/1.6 var(--mono); color: var(--muted); }
     .state a { font-weight: 600; }
+    .pager { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 22px; }
+    .pager:empty { margin: 0; }
+    .pg { font: 600 13px/1 var(--mono); color: var(--muted); background: transparent; border: 1px solid var(--line-2);
+      border-radius: 999px; padding: 9px 16px; cursor: pointer; transition: color .15s, border-color .15s; }
+    .pg:hover:not(:disabled) { color: var(--accent); border-color: var(--accent); }
+    .pg:disabled { opacity: .4; cursor: default; }
+    .pg-info { font: 500 12.5px/1 var(--mono); color: var(--faint); }
 
     .foot { margin-top: 42px; padding-top: 22px; border-top: 1px solid var(--line); font: 500 12.5px/1.7 var(--mono); color: var(--faint); }
     .foot a { color: var(--muted); } .foot a:hover { color: var(--accent); }
@@ -104,6 +111,7 @@
       </thead>
       <tbody id="rank-body"></tbody>
     </table>
+    <div id="rank-pager" class="pager"></div>
     <div id="rank-state"></div>
 
     <footer class="foot">

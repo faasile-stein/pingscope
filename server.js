@@ -322,6 +322,15 @@ const sovUpsertStmt = db.prepare(`
 `);
 const sovSeedStmt = db.prepare('SELECT domain, data, at FROM sov_scores');
 const sovRankStmt = db.prepare('SELECT domain, web, mail, at FROM sov_scores');
+// SQL-level ranking pagination — scales past a handful of rows. Composite score
+// = mean of web & mail (or the one that exists); ORDER done in SQL so we never
+// pull the whole table into memory.
+const sovCountStmt = db.prepare('SELECT COUNT(*) c FROM sov_scores');
+const sovPageStmt = db.prepare(`
+  SELECT domain, web, mail, at FROM sov_scores
+  ORDER BY (COALESCE(web, mail, 0) + COALESCE(mail, web, 0)) DESC, at DESC
+  LIMIT $limit OFFSET $offset
+`);
 
 // If a previous database was set aside as *.corrupt-* (see the boot self-heal
 // above), try to salvage its sovereignty ranking into the live DB. The
@@ -668,13 +677,16 @@ app.get('/ranking', (_req, res) => {
   res.type('html').sendFile(path.join(__dirname, 'public', 'ranking.html'));
 });
 app.get('/api/rankings', (req, res) => {
-  const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 300));
-  const rows = sovRankStmt.all()
-    .map((r) => ({ domain: r.domain, web: r.web, mail: r.mail, at: r.at,
-      composite: r.mail == null ? r.web : (r.web == null ? r.mail : Math.round((r.web + r.mail) / 2)) }))
-    .sort((a, b) => (b.composite ?? -1) - (a.composite ?? -1) || b.at - a.at)
-    .slice(0, limit);
-  res.json({ count: rows.length, rankings: rows });
+  const total = sovCountStmt.get().c;
+  const per = Math.min(200, Math.max(1, Number(req.query.per) || 100));
+  const pages = Math.max(1, Math.ceil(total / per));
+  const page = Math.min(pages, Math.max(1, Number(req.query.page) || 1));
+  const offset = (page - 1) * per;
+  const rankings = sovPageStmt.all({ limit: per, offset }).map((r, i) => ({
+    rank: offset + i + 1, domain: r.domain, web: r.web, mail: r.mail, at: r.at,
+    composite: r.mail == null ? r.web : (r.web == null ? r.mail : Math.round((r.web + r.mail) / 2)),
+  }));
+  res.json({ total, page, per, pages, rankings });
 });
 
 app.use(express.static(path.join(__dirname, 'public')));

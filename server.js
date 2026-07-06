@@ -8,12 +8,14 @@ const dnsBase = require('dns');
 const dns = dnsBase.promises;
 const net = require('net');
 
-// Resolve through reliable public resolvers instead of the platform-assigned
-// one: a Firecracker microVM's resolver can go away (as it did on 2026-07-06),
-// which otherwise breaks ALL DNS — probes, sovereignty checks and MTR. This
-// routes every c-ares query (resolve4/6/Mx/reverse, and lookupHost below) to
-// these servers over UDP/TCP 53, which egress allows. Overridable via env.
-const DNS_SERVERS = (process.env.DNS_SERVERS || '1.1.1.1,8.8.8.8,1.0.0.1')
+// Resolve through European resolvers instead of the platform-assigned one: a
+// Firecracker microVM's resolver can go away (as it did on 2026-07-06), which
+// otherwise breaks ALL DNS — probes, sovereignty checks and MTR. Defaults to
+// dns0.eu (EU, GDPR non-profit) with Quad9 (Swiss foundation, in the sovereign
+// area) as fallback — fitting for a sovereignty tool. Routes every c-ares query
+// (resolve4/6/Mx/reverse, and lookupHost below) to these over UDP/TCP 53.
+// Overridable via the DNS_SERVERS env.
+const DNS_SERVERS = (process.env.DNS_SERVERS || '193.110.81.0,185.253.5.0,9.9.9.9')
   .split(',').map((s) => s.trim()).filter(Boolean);
 try { dnsBase.setServers(DNS_SERVERS); console.log('  dns: resolvers →', DNS_SERVERS.join(', ')); }
 catch (e) { console.warn('  dns: setServers failed —', e.message); }

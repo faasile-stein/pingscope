@@ -3,7 +3,6 @@
 // endpoint and renders the web + mail scores. (The live-streaming version with
 // per-hop discovery lives in the main app.)
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const ccFlag = (cc) => (!cc || cc.length !== 2) ? '🌐'
   : cc.toUpperCase().replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)));
 // sovereign green (#35e0a1, score 100) → non-sovereign red (#ff6272, score 0)
@@ -24,38 +23,50 @@ const ago = (ts) => {
 
 const resultEl = document.getElementById('result');
 
-function serverHtml(sv) {
+// tiny DOM builder: text goes in as text nodes, so nothing is ever parsed as HTML
+const h = (tag, props, ...kids) => {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(props || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'color') el.style.color = v;
+    else if (k === 'borderColor') el.style.borderColor = v;
+    else el.setAttribute(k, v);
+  }
+  el.append(...kids.flat().filter((c) => c != null && c !== false));
+  return el;
+};
+
+function serverEl(sv) {
   const ownerFlag = sv.ownerCc ? ccFlag(sv.ownerCc) : '';
   const half = sv.eu && !sv.euOwned;
-  const asTitle = sv.euOwned ? '' : `owned by ${esc(sv.ownerParent || sv.asName || 'a non-sovereign company')} (${esc(sv.ownerCc || '?')}) — outside the sovereign area, hosting score halved`;
-  return `<div class="srv">
-    <div class="srv-top"><span>${ccFlag(sv.cc)}</span><span class="srv-ip">${esc(sv.exchange || sv.ip)}</span></div>
-    <div class="srv-sub">
-      <span class="srv-geo">${esc([sv.city, sv.country].filter(Boolean).join(', ') || 'location unknown')}</span>
-      <span class="srv-as ${sv.euOwned ? 'ok' : 'bad'}"${asTitle ? ` title="${asTitle}"` : ''}>${ownerFlag} ${esc(sv.asName || sv.as || '')}${half ? ' <b class="half">½</b>' : ''}</span>
-    </div>
-  </div>`;
+  const asTitle = sv.euOwned ? '' : `owned by ${sv.ownerParent || sv.asName || 'a non-sovereign company'} (${sv.ownerCc || '?'}) — outside the sovereign area, hosting score halved`;
+  return h('div', { class: 'srv' },
+    h('div', { class: 'srv-top' }, h('span', null, ccFlag(sv.cc)), h('span', { class: 'srv-ip' }, sv.exchange || sv.ip)),
+    h('div', { class: 'srv-sub' },
+      h('span', { class: 'srv-geo' }, [sv.city, sv.country].filter(Boolean).join(', ') || 'location unknown'),
+      h('span', { class: `srv-as ${sv.euOwned ? 'ok' : 'bad'}`, title: asTitle || null },
+        `${ownerFlag} ${sv.asName || sv.as || ''}`, half ? [' ', h('b', { class: 'half' }, '½')] : null)));
 }
 
-function catHtml(title, icon, cat, emptyMsg) {
+function catEl(title, icon, cat, emptyMsg) {
   if (!cat || (cat.score == null && (!cat.servers || !cat.servers.length))) {
-    return `<div class="cat"><div class="cat-h">${icon} ${title}</div><div class="cat-empty">${esc(emptyMsg)}</div></div>`;
+    return h('div', { class: 'cat' }, h('div', { class: 'cat-h' }, `${icon} ${title}`), h('div', { class: 'cat-empty' }, emptyMsg));
   }
   const color = sovColor(cat.score);
-  const servers = (cat.servers || []).map(serverHtml).join('') || '<div class="cat-empty">no servers resolved</div>';
+  const servers = (cat.servers || []).map(serverEl);
   const transit = cat.transit
-    ? `route <b>${cat.transit.hopsNonEuPct}%</b> hops · <b>${cat.transit.netsNonEuPct}%</b> networks non-sovereign`
-    : '<span class="dim">route not measured (target blocks traceroute)</span>';
+    ? ['route ', h('b', null, `${cat.transit.hopsNonEuPct}%`), ' hops · ', h('b', null, `${cat.transit.netsNonEuPct}%`), ' networks non-sovereign']
+    : h('span', { class: 'dim' }, 'route not measured (target blocks traceroute)');
   // "visualize" opens the live MTR on a map (geographic view) in the main app
   const primaryIp = (cat.servers && cat.servers[0] && cat.servers[0].ip) || '';
-  const viz = primaryIp ? `<a class="viz-pill" href="/?mtr=${encodeURIComponent(primaryIp)}&view=geo" target="_blank" rel="noopener" title="trace this route on a world map">▸ visualize</a>` : '';
-  return `<div class="cat">
-    <div class="cat-h">${icon} ${title}${viz}</div>
-    <div class="score" style="color:${color}">${cat.score == null ? '—' : cat.score}<small>/100</small></div>
-    <div class="badge" style="color:${color};border-color:${color}">${sovLabel(cat.score)}</div>
-    <div class="srvs">${servers}</div>
-    <div class="transit">${transit}</div>
-  </div>`;
+  const viz = primaryIp ? h('a', { class: 'viz-pill', href: `/?mtr=${encodeURIComponent(primaryIp)}&view=geo`, target: '_blank', rel: 'noopener', title: 'trace this route on a world map' }, '▸ visualize') : null;
+  return h('div', { class: 'cat' },
+    h('div', { class: 'cat-h' }, `${icon} ${title}`, viz),
+    h('div', { class: 'score', color }, cat.score == null ? '—' : String(cat.score), h('small', null, '/100')),
+    h('div', { class: 'badge', color, borderColor: color }, sovLabel(cat.score)),
+    h('div', { class: 'srvs' }, servers.length ? servers : h('div', { class: 'cat-empty' }, 'no servers resolved')),
+    h('div', { class: 'transit' }, transit));
 }
 
 // domains only — reject bare IPs / single-label / malformed hosts before the round-trip
@@ -71,17 +82,17 @@ async function check(input, fresh) {
   const q = (input || '').trim();
   if (!q) return;
   if (!looksLikeDomain(q)) {
-    resultEl.innerHTML = '<div class="r-error">Enter a domain, e.g. <b>example.com</b> — not an IP address.</div>';
+    resultEl.replaceChildren(h('div', { class: 'r-error' }, 'Enter a domain, e.g. ', h('b', null, 'example.com'), ' — not an IP address.'));
     resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     return;
   }
-  resultEl.innerHTML = `<div class="r-loading">${fresh ? 're-tracing' : 'tracing'} web + mail routes… this can take a few seconds</div>`;
+  resultEl.replaceChildren(h('div', { class: 'r-loading' }, `${fresh ? 're-tracing' : 'tracing'} web + mail routes… this can take a few seconds`));
   resultEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   setBusy(true);
   try {
     const res = await fetch('/api/sovereignty?url=' + encodeURIComponent(q) + (fresh ? '&fresh=1' : ''));
     const data = await res.json();
-    if (!res.ok) { resultEl.innerHTML = `<div class="r-error">${esc(data.error || 'scan failed')}</div>`; return; }
+    if (!res.ok) { resultEl.replaceChildren(h('div', { class: 'r-error' }, data.error || 'scan failed')); return; }
     const web = data.web && data.web.score, mail = data.mail && data.mail.score;
     // shareable link carries the scores so the crawler's card needs no re-scan
     const share = `${location.origin}/sovereignty?d=${encodeURIComponent(data.domain)}` +
@@ -89,28 +100,28 @@ async function check(input, fresh) {
     const note = data.cached
       ? `cached · scored ${ago(data.at)}${data.rateLimited ? ' · rate-limited, showing last result' : ''}`
       : 'freshly scored · a preview card with these scores';
-    resultEl.innerHTML =
-      `<div class="r-domain">results for <b>${esc(data.domain)}</b>${data.mailDomain && data.mailDomain !== data.domain ? ` · mail on <b>${esc(data.mailDomain)}</b>` : ''}</div>` +
-      '<div class="cats">' +
-      catHtml('Web', '🌐', data.web, 'no web servers found') +
-      catHtml('Mail', '✉️', data.mail, `no mail servers (no MX record for ${data.mailDomain || data.domain})`) +
-      '</div>' +
-      '<div class="share-row">' +
-      `<button class="share-btn" data-share="${esc(share)}">🔗 Share this result</button>` +
-      `<button class="retest-btn" data-domain="${esc(data.domain)}">↻ Retest</button>` +
-      `<span class="share-hint">${esc(note)}</span>` +
-      '</div>';
-    resultEl.querySelector('.share-btn').onclick = (e) => {
+    const shareBtn = h('button', { class: 'share-btn' }, '🔗 Share this result');
+    const retestBtn = h('button', { class: 'retest-btn' }, '↻ Retest');
+    resultEl.replaceChildren(
+      h('div', { class: 'r-domain' }, 'results for ', h('b', null, data.domain),
+        data.mailDomain && data.mailDomain !== data.domain ? [' · mail on ', h('b', null, data.mailDomain)] : null),
+      h('div', { class: 'cats' },
+        catEl('Web', '🌐', data.web, 'no web servers found'),
+        catEl('Mail', '✉️', data.mail, `no mail servers (no MX record for ${data.mailDomain || data.domain})`)),
+      h('div', { class: 'share-row' }, shareBtn, retestBtn, h('span', { class: 'share-hint' }, note)));
+    shareBtn.dataset.share = share;
+    retestBtn.dataset.domain = data.domain;
+    shareBtn.onclick = (e) => {
       const btn = e.currentTarget;
       navigator.clipboard.writeText(btn.dataset.share).then(() => {
         btn.textContent = '✓ link copied'; setTimeout(() => { btn.textContent = '🔗 Share this result'; }, 1800);
       }).catch(() => { btn.textContent = btn.dataset.share; });
     };
-    resultEl.querySelector('.retest-btn').onclick = (e) => check(e.currentTarget.dataset.domain, true);
+    retestBtn.onclick = (e) => check(e.currentTarget.dataset.domain, true);
     // reflect scores in the URL so the current page is itself shareable
     try { history.replaceState(null, '', share.slice(location.origin.length)); } catch { /* ignore */ }
   } catch {
-    resultEl.innerHTML = '<div class="r-error">scan failed — network error</div>';
+    resultEl.replaceChildren(h('div', { class: 'r-error' }, 'scan failed — network error'));
   } finally {
     setBusy(false);
   }

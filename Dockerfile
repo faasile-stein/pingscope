@@ -1,5 +1,7 @@
 # PingScope — runs the Node server plus ping/traceroute inside the container.
-FROM node:22-slim
+# Exact Node release pinned (22.23.4 = Oct 2026 security release): a floating
+# `node:22-slim` silently reuses whatever stale copy the build host has cached.
+FROM node:22.23.4-bookworm-slim
 # Verify the toolchain matches the image architecture (guards against a poisoned
 # cross-arch build cache producing "Exec format error").
 RUN node -v && npm -v
@@ -42,9 +44,14 @@ RUN set -eu; mkdir -p geo; \
       || echo "WARN: asn-names download failed (falls back to DB-IP org)"; \
     ls -l geo
 
-# Install deps first for better layer caching.
+# Install deps first for better layer caching. If the build host inspects TLS
+# (a package-firewall proxy re-signing registry.npmjs.org), pass that proxy's CA
+# as the optional `npm_ca` build secret — trusted for this step only, never
+# stored in a layer: docker build --secret id=npm_ca,src=<proxy-ca.pem> ...
 COPY package*.json ./
-RUN npm ci --omit=dev || npm install --omit=dev
+RUN --mount=type=secret,id=npm_ca \
+    if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
+    npm ci --omit=dev || npm install --omit=dev
 
 COPY . .
 

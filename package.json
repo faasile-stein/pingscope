@@ -9,7 +9,7 @@
   },
   "dependencies": {
     "@resvg/resvg-js": "^2.6.2",
-    "express": "^4.22.3",
+    "express": "^5.3.0",
     "helmet": "^8.2.0",
     "maxmind": "^4.3.24",
     "ws": "^8.18.0"

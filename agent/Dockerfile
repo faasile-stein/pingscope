@@ -1,6 +1,6 @@
 # PingScope community agent — tiny: just Node + mtr.
 # Exact Node release pinned (22.23.4 = Oct 2026 security release).
-FROM node:22.23.4-bookworm-slim
+FROM node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends mtr-tiny ca-certificates libcap2-bin \
@@ -14,11 +14,12 @@ RUN setcap cap_net_raw+ep "$(command -v mtr-packet)"
 
 WORKDIR /app
 COPY package*.json ./
-# Optional `npm_ca` build secret: CA of a TLS-inspecting proxy on the build host
+# Install the committed lockfile; fail the build if it is stale or unavailable.
+# Optional `proxy_ca` build secret: CA of a TLS-inspecting proxy on the build host
 # (see ../Dockerfile); trusted for this step only, never stored in a layer.
-RUN --mount=type=secret,id=npm_ca \
-    if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
-    npm ci --omit=dev || npm install --omit=dev
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    npm ci --omit=dev
 COPY agent.js ./
 RUN chown -R node:node /app
 

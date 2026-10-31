@@ -147,10 +147,49 @@ the feature is simply off.
 
 ## Run without Docker (dev)
 
-Requires Node ≥ 22.5 (for `node:sqlite`). On Linux you may need
+Use Node 22.23.4, matching the pinned Docker image and tested `node:sqlite`
+runtime. On Linux you may need
 `sudo setcap cap_net_raw+ep $(which ping)` or run as root for ICMP.
 
 ```sh
 npm install
 npm start
 ```
+
+## Security regression checks
+
+History aggregation runs in one read-only SQLite worker, with at most eight
+pending requests and a five-second deadline including queue time. Overloaded
+or slow requests receive HTTP 503 with `Retry-After: 5`; other API and live-feed
+work remains on the main thread. Large valid history ranges may reach that
+deadline, so check representative retention volumes in staging. Worker
+termination can wait for a native SQLite statement to finish; no replacement
+worker starts until the old one exits.
+
+The browser WebSocket endpoint checks explicit Origins against the request's
+scheme and host. A TLS-terminating proxy must preserve `Host`, overwrite
+`X-Forwarded-Proto` and `X-Forwarded-For`, and keep the backend port private.
+Same-origin browsers and native clients without an Origin remain supported;
+`/agent` continues to authenticate its hello token. These checks do not turn
+the public API into an authenticated service.
+
+Use Node 22.23.4, matching the application's pinned and tested runtime:
+
+```sh
+npm ci
+npm test
+docker build --check .
+docker build --check agent/
+bash tests/build-context.sh
+```
+
+The tests use temporary databases, loopback HTTP/WebSocket listeners, local
+fixtures, and stubbed DNS/probe processes. They do not start the measurement
+loop or contact monitored targets. Frontend checks exercise renderer output
+with a minimal DOM fixture; they are not full browser tests.
+
+The security review's per-result evidence, callback outcomes, verification
+commands, and deployment retest instructions are in
+[`SECURITY-REVIEW.md`](SECURITY-REVIEW.md) and
+[`security-findings.json`](security-findings.json). Local fixes still require
+a separate Provenby retest after the reviewed revision is deployed.

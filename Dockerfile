@@ -1,7 +1,7 @@
 # PingScope — runs the Node server plus ping/traceroute inside the container.
 # Exact Node release pinned (22.23.4 = Oct 2026 security release): a floating
 # `node:22-slim` silently reuses whatever stale copy the build host has cached.
-FROM node:22.23.4-bookworm-slim
+FROM node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da
 # Verify the toolchain matches the image architecture (guards against a poisoned
 # cross-arch build cache producing "Exec format error").
 RUN node -v && npm -v
@@ -30,7 +30,17 @@ WORKDIR /app
 # app makes NO external geo calls at runtime. Tries the current month, falling
 # back to the previous one if this month isn't published yet. Cached layer —
 # refresh with a --no-cache rebuild.
-RUN set -eu; mkdir -p geo; \
+#
+# Build hosts that inspect TLS (a package-firewall proxy re-signing
+# registry.npmjs.org / raw.githubusercontent.com) pass that proxy's CA as the
+# optional `proxy_ca` build secret. Only the download steps trust it, and it is
+# never stored in a layer: docker build --secret id=proxy_ca,src=<proxy-ca.pem> ...
+RUN --mount=type=secret,id=proxy_ca \
+    set -eu; mkdir -p geo; \
+    if [ -f /run/secrets/proxy_ca ]; then \
+      cat /etc/ssl/certs/ca-certificates.crt /run/secrets/proxy_ca > /tmp/ca.pem; \
+      export CURL_CA_BUNDLE=/tmp/ca.pem; \
+    fi; \
     for ym in "$(date +%Y-%m)" "$(date -d 'last month' +%Y-%m)"; do \
       if curl -fsSL "https://download.db-ip.com/free/dbip-asn-lite-${ym}.mmdb.gz" -o /tmp/asn.gz \
       && curl -fsSL "https://download.db-ip.com/free/dbip-city-lite-${ym}.mmdb.gz" -o /tmp/city.gz; then \
@@ -42,16 +52,14 @@ RUN set -eu; mkdir -p geo; \
     done; \
     curl -fsSL "https://raw.githubusercontent.com/ipverse/asn-info/master/as.csv" -o geo/asn-names.csv \
       || echo "WARN: asn-names download failed (falls back to DB-IP org)"; \
-    ls -l geo
+    rm -f /tmp/ca.pem; ls -l geo
 
-# Install deps first for better layer caching. If the build host inspects TLS
-# (a package-firewall proxy re-signing registry.npmjs.org), pass that proxy's CA
-# as the optional `npm_ca` build secret — trusted for this step only, never
-# stored in a layer: docker build --secret id=npm_ca,src=<proxy-ca.pem> ...
+# Install the committed lockfile; fail the build if it is stale or unavailable.
+# Install deps first for better layer caching (optional `proxy_ca`: see above).
 COPY package*.json ./
-RUN --mount=type=secret,id=npm_ca \
-    if [ -f /run/secrets/npm_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/npm_ca; fi; \
-    npm ci --omit=dev || npm install --omit=dev
+RUN --mount=type=secret,id=proxy_ca \
+    if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
+    npm ci --omit=dev
 
 COPY . .
 

@@ -6,5 +6,8 @@ data
 npm-debug.log
 .git
 .DS_Store
+# Local environment files must not enter images, including the agent's config.
+**/.env
+**/.env.*
 geo/
 *.mmdb

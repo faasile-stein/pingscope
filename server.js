@@ -26,6 +26,7 @@ const { DatabaseSync } = require('node:sqlite');
 const maxmind = require('maxmind');
 const helmet = require('helmet');
 const { Resvg } = require('@resvg/resvg-js');
+const { HistoryReader } = require('./history-reader');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -761,29 +762,15 @@ app.get('/api/sovereignty', async (req, res) => {
 // Aggregated history for browsing the past (SmokePing-style day/week/month views).
 // Rows are grouped into `buckets` equal time slices; each slice keeps the latency
 // envelope (min/max), average percentiles and packet loss.
-const bucketStmt = db.prepare(`
-  SELECT
-    CAST((t - $from) / $bucket AS INTEGER) AS b,
-    MIN(min)    AS min,
-    MAX(max)    AS max,
-    AVG(median) AS median,
-    AVG(p25)    AS p25,
-    AVG(p75)    AS p75,
-    AVG(loss)   AS loss,
-    SUM(sent)   AS sent,
-    SUM(recv)   AS recv,
-    COUNT(*)    AS n
-  FROM samples
-  WHERE target_id = $tid AND t >= $from AND t < $to
-  GROUP BY b ORDER BY b
-`);
+const historyReader = new HistoryReader(DB_PATH);
 
-app.get('/api/history', (req, res) => {
+app.get('/api/history', async (req, res) => {
   const now = Date.now();
-  let to = Number(req.query.to) || now;
-  let from = Number(req.query.from);
-  if (!Number.isFinite(from)) from = to - 3600_000; // default: last hour
-  if (to <= from) return res.status(400).json({ error: 'bad range' });
+  const to = req.query.to == null ? now : Number(req.query.to);
+  const from = req.query.from == null ? to - 3600_000 : Number(req.query.from);
+  if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || to <= from || !Number.isSafeInteger(to - from)) {
+    return res.status(400).json({ error: 'bad range' });
+  }
   const buckets = Math.min(1000, Math.max(10, Number(req.query.buckets) || 240));
   const bucket = Math.max(1000, Math.ceil((to - from) / buckets));
 
@@ -791,32 +778,48 @@ app.get('/api/history', (req, res) => {
   const reqTarget = req.query.target;
   let ids;
   if (!reqTarget || reqTarget === 'all') ids = PROBES.map((p) => p.id);
-  else ids = String(reqTarget).split(',').filter((id) => PROBES.some((p) => p.id === id));
+  else ids = [...new Set(String(reqTarget).split(','))].filter((id) => PROBES.some((p) => p.id === id));
   if (!ids.length) return res.status(404).json({ error: 'unknown target' });
 
-  const out = {};
-  for (const tid of ids) {
-    const rows = bucketStmt.all({ tid, from, to, bucket });
-    out[tid] = rows.map((r) => ({
-      targetId: tid,
-      t: from + (r.b + 0.5) * bucket,
-      min: r.min, max: r.max, median: r.median,
-      p25: r.p25, p75: r.p75,
-      loss: r.loss, sent: r.sent, recv: r.recv,
-      n: r.n, samples: [],
-    }));
+  try {
+    const targets = await historyReader.read({ ids, from, to, bucket });
+    res.json({ from, to, bucket, targets });
+  } catch {
+    res.status(503).set('Retry-After', '5').json({ error: 'history busy — try again shortly' });
   }
-  res.json({ from, to, bucket, targets: out });
 });
 
 const server = http.createServer(app);
+server.on('close', () => { historyReader.close(); });
 // Two WebSocket endpoints on the same port: browsers at "/", community agents
 // at "/agent". Route by path at upgrade time.
 const wss = new WebSocketServer({ noServer: true, maxPayload: 1 << 20 });   // browsers
 const ass = new WebSocketServer({ noServer: true, maxPayload: 256 * 1024 }); // agents
+// Browsers supply Origin; reject cross-site pages before they can spend the
+// visitor's per-IP trace budget. Originless native clients remain supported;
+// the separate community-agent endpoint still authenticates its hello token.
+function allowedBrowserOrigin(req) {
+  const origin = req.headers.origin;
+  if (origin === undefined) return true;
+  try {
+    const parsed = new URL(origin);
+    // Match Express's existing trusted reverse-proxy deployment: the edge
+    // preserves Host and overwrites X-Forwarded-Proto for HTTPS termination.
+    const forwarded = req.headers['x-forwarded-proto'];
+    const protocol = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : (req.socket.encrypted ? 'https' : 'http');
+    if (protocol !== 'http' && protocol !== 'https') return false;
+    const expected = new URL(`${protocol}://${req.headers.host}`);
+    return parsed.origin === origin && parsed.origin === expected.origin;
+  } catch { return false; }
+}
+
 server.on('upgrade', (req, socket, head) => {
   let pathname = '/';
   try { pathname = new URL(req.url, 'http://x').pathname; } catch { /* default */ }
+  if (pathname !== '/agent' && !allowedBrowserOrigin(req)) {
+    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Length: 0\r\n\r\n');
+    return;
+  }
   const target = pathname === '/agent' ? ass : wss;
   target.handleUpgrade(req, socket, head, (ws) => target.emit('connection', ws, req));
 });

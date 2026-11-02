@@ -56,3 +56,18 @@ docker logs -f pingscope-agent
 | `AGENT_MAX_PER_MIN`   | `20`                                               | max traceroutes per minute       |
 
 Stop any time with `docker compose down`. Thanks for contributing a vantage! 🌍
+
+## Container health
+
+The image's health check reports healthy only after registration succeeds and
+while server pong replies remain fresh (less than 75 seconds old). Rejection,
+disconnection, or a stale connection reports unhealthy. It reads a local
+heartbeat in `/tmp`; it does not open an inbound listener or send extra network
+probes. The Compose file provides a small `/tmp` tmpfs so this works with its
+read-only root filesystem. If you use `docker run --read-only`, also pass
+`--tmpfs /tmp:rw,noexec,nosuid,size=1m`.
+
+Inspect health with `docker inspect --format '{{.State.Health.Status}}' pingscope-agent`.
+Docker health status is a monitoring signal; `restart: unless-stopped` alone
+does not restart an unhealthy running container. Configure the deployment's
+monitoring/recovery policy separately.

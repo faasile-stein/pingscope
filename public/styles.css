@@ -707,3 +707,12 @@ body.mtr-open .globe-canvas, body.mtr-open .globe-labels, body.mtr-open .globe-h
   .globe-hud { left: 12px; top: 58px; bottom: auto; font-size: 10.5px; padding: 9px 11px; }
   .globe-label .gl-name { display: none; }
 }
+
+/* Dynamic colors use DOM style properties, never interpolated style attributes. */
+.initially-hidden { display: none; }
+.sov-method-link { color: var(--accent); text-decoration: none; }
+.vchip.unavailable { pointer-events: none; opacity: .55; }
+.tip-track { margin-bottom: 3px; }
+.sov-score, .sov-badge2 { color: var(--sov-color, var(--muted)); }
+.sov-badge2 { border-color: var(--sov-color, var(--muted)); }
+.ov-legend i { background: linear-gradient(90deg,#2ecc40,#ffdc00,#ff851b,#ff4136,#b10dc9); }

@@ -27,6 +27,7 @@ const maxmind = require('maxmind');
 const helmet = require('helmet');
 const { Resvg } = require('@resvg/resvg-js');
 const { HistoryReader } = require('./history-reader');
+const { HistoryBudget } = require('./history-budget');
 
 // ---------------------------------------------------------------------------
 // Config
@@ -82,9 +83,16 @@ function isPublicIpv4(ip) {
 // link-local (fe80::/10), unique-local (fc00::/7), multicast (ff00::/8) and the
 // documentation range; v4-mapped tails fall through to the IPv4 rules.
 function isPublicIpv6(ip) {
-  const a = ip.toLowerCase();
-  const mapped = a.match(/^::(?:ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mapped) return isPublicIpv4(mapped[1]);
+  // Normalize expanded/embedded notation before checking ranges. For example,
+  // ::ffff:127.0.0.1 and 0:0:0:0:0:ffff:7f00:1 are the same loopback target.
+  let a;
+  try { a = new URL(`http://[${ip}]/`).hostname.slice(1, -1); }
+  catch { return false; }
+  const mapped = a.match(/^::(?:ffff:)?([a-f0-9]{1,4}):([a-f0-9]{1,4})$/);
+  if (mapped) {
+    const hi = parseInt(mapped[1], 16), lo = parseInt(mapped[2], 16);
+    return isPublicIpv4(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  }
   if (a === '::' || a === '::1') return false;
   const first = a.startsWith('::') ? 0 : parseInt(a.split(':')[0] || '0', 16);
   if (Number.isNaN(first)) return false;
@@ -492,10 +500,12 @@ function seedHistory() {
 }
 
 const app = express();
-app.set('trust proxy', true); // behind bootload's proxy → correct req.protocol/host
+// Trust forwarded client/protocol headers only from explicitly configured
+// proxy addresses. Direct deployments must not let clients choose budget keys.
+app.set('trust proxy', process.env.TRUST_PROXY ? process.env.TRUST_PROXY.split(',').map((s) => s.trim()).filter(Boolean) : false);
 
-// Content-Security-Policy. Allows: our own assets; the Three.js modules on unpkg
-// (resolved via the inline import-map, which gets a per-request nonce); the
+// Content-Security-Policy. Allows: our own assets, including pinned Three.js
+// modules (the inline import-map gets a per-request nonce); the
 // world-atlas TopoJSON fetched from jsdelivr; same-origin WebSocket. `nonce`
 // null = the strict baseline used for static assets (no inline script allowed).
 function csp(nonce) {
@@ -506,8 +516,8 @@ function csp(nonce) {
     "frame-ancestors 'none'",
     "form-action 'self'",
     "img-src 'self' data:",
-    "style-src 'self' 'unsafe-inline'",
-    `script-src 'self' https://unpkg.com${nonce ? ` 'nonce-${nonce}'` : ''}`,
+    "style-src 'self'",
+    `script-src 'self'${nonce ? ` 'nonce-${nonce}'` : ''}`,
     "connect-src 'self' https://cdn.jsdelivr.net",
     "font-src 'self'",
   ].join('; ');
@@ -517,7 +527,7 @@ function csp(nonce) {
 // Referrer-Policy, COOP, etc. — and it strips X-Powered-By). We keep our OWN
 // Content-Security-Policy: it carries a per-request nonce for the inline
 // import-map, which Helmet's static CSP can't express — so Helmet's CSP is
-// disabled here. COEP is left off so the Three.js ES modules load from unpkg.
+// disabled here. COEP is left off for compatibility with the existing app.
 app.use(helmet({
   contentSecurityPolicy: false,
   crossOriginEmbedderPolicy: false,
@@ -696,9 +706,10 @@ app.get('/ranking', (_req, res) => {
 });
 app.get('/api/rankings', (req, res) => {
   const total = sovCountStmt.get().c;
-  const per = Math.min(200, Math.max(1, Number(req.query.per) || 100));
+  // SQLite LIMIT/OFFSET require integers; keep the existing defaults and caps.
+  const per = Math.min(200, Math.max(1, Math.trunc(Number(req.query.per) || 100)));
   const pages = Math.max(1, Math.ceil(total / per));
-  const page = Math.min(pages, Math.max(1, Number(req.query.page) || 1));
+  const page = Math.min(pages, Math.max(1, Math.trunc(Number(req.query.page) || 1)));
   const offset = (page - 1) * per;
   const rankings = sovPageStmt.all({ limit: per, offset }).map((r, i) => ({
     rank: offset + i + 1, domain: r.domain, web: r.web, mail: r.mail, at: r.at,
@@ -707,6 +718,10 @@ app.get('/api/rankings', (req, res) => {
   res.json({ total, page, per, pages, rankings });
 });
 
+// Serve the lockfile-pinned browser modules without trusting a public script CDN.
+// Limit the mounts to module directories; package metadata stays private.
+app.use('/vendor/three/build', express.static(path.join(__dirname, 'node_modules/three/build')));
+app.use('/vendor/three/addons', express.static(path.join(__dirname, 'node_modules/three/examples/jsm')));
 app.use(express.static(path.join(__dirname, 'public')));
 // Full probe catalog + the default-visualised set.
 app.get('/api/probes', (_req, res) => res.json({ probes: PROBES, preselected: PRESELECTED }));
@@ -763,6 +778,7 @@ app.get('/api/sovereignty', async (req, res) => {
 // Rows are grouped into `buckets` equal time slices; each slice keeps the latency
 // envelope (min/max), average percentiles and packet loss.
 const historyReader = new HistoryReader(DB_PATH);
+const historyBudget = new HistoryBudget();
 
 app.get('/api/history', async (req, res) => {
   const now = Date.now();
@@ -781,12 +797,26 @@ app.get('/api/history', async (req, res) => {
   else ids = [...new Set(String(reqTarget).split(','))].filter((id) => PROBES.some((p) => p.id === id));
   if (!ids.length) return res.status(404).json({ error: 'unknown target' });
 
+  const cost = ids.length * Math.ceil((to - from) / bucket);
+  if (cost > historyBudget.capacity) {
+    return res.status(400).json({ error: 'history query too large — select fewer targets or buckets' });
+  }
+  const wait = historyBudget.take(req.ip, cost);
+  if (wait) {
+    return res.status(429).set('Retry-After', String(wait)).json({ error: 'history rate limited — try again shortly' });
+  }
+
   try {
     const targets = await historyReader.read({ ids, from, to, bucket });
     res.json({ from, to, bucket, targets });
   } catch {
     res.status(503).set('Retry-After', '5').json({ error: 'history busy — try again shortly' });
   }
+});
+
+// Keep unmatched-route responses generic while retaining the strict error CSP.
+app.use((_req, res) => {
+  res.status(404).set('Content-Security-Policy', "default-src 'none'").type('text/plain').send('Not found');
 });
 
 const server = http.createServer(app);
@@ -803,10 +833,9 @@ function allowedBrowserOrigin(req) {
   if (origin === undefined) return true;
   try {
     const parsed = new URL(origin);
-    // Match Express's existing trusted reverse-proxy deployment: the edge
-    // preserves Host and overwrites X-Forwarded-Proto for HTTPS termination.
-    const forwarded = req.headers['x-forwarded-proto'];
-    const protocol = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : (req.socket.encrypted ? 'https' : 'http');
+    // Upgrade requests do not pass through Express middleware. Reuse its
+    // configured proxy trust rather than accepting arbitrary forwarded headers.
+    const protocol = expressRequest(req).protocol;
     if (protocol !== 'http' && protocol !== 'https') return false;
     const expected = new URL(`${protocol}://${req.headers.host}`);
     return parsed.origin === origin && parsed.origin === expected.origin;
@@ -854,13 +883,13 @@ function publicAgents() { return [...agents.values()].map(publicAgent); }
 function broadcastAgents() { broadcast({ type: 'agents', agents: publicAgents() }); }
 
 ass.on('connection', (ws, req) => {
-  const xff = (req.headers['x-forwarded-for'] || '').split(',')[0].trim();
-  const ip = xff || (req.socket.remoteAddress || '').replace(/^::ffff:/, '');
+  const ip = clientIp(req).replace(/^::ffff:/, '');
   let agent = null;
   const helloTimer = setTimeout(() => ws.close(), 5000); // must authenticate quickly
 
   ws.on('message', (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return;
     if (m.type === 'hello') {
       clearTimeout(helloTimer);
       if (!AGENT_TOKEN || !safeEqual(m.token || '', AGENT_TOKEN)) {
@@ -892,19 +921,28 @@ ass.on('connection', (ws, req) => {
 // Per-user (IP) rate limit: at most one trace OR sovereignty check per 20s.
 const RATE_MS = Number(process.env.RATE_MS || 20_000);
 const lastActionByIp = new Map();
-// The edge sets `X-Forwarded-For: <client-ip>, <edge-vrack-ip>`, so the real
-// client is the FIRST (leftmost) entry — that's the one we rate-limit on.
+let nextActionCleanup = 0;
+// The HTTP and upgrade paths must use the same trusted-proxy interpretation.
+// A lightweight request view gives upgrades Express's IP/protocol getters.
+function expressRequest(req) {
+  return Object.assign(Object.create(app.request), { app, headers: req.headers, socket: req.socket });
+}
 function clientIp(req) {
-  const xff = (req && req.headers && req.headers['x-forwarded-for']) || '';
-  return xff.split(',')[0].trim() || (req && req.socket && req.socket.remoteAddress) || 'unknown';
+  return req ? (req.ip || expressRequest(req).ip || 'unknown') : 'unknown';
 }
 // 0 = allowed (records the hit); otherwise the seconds until the next allowed action.
 function rateLimit(ip) {
   const now = Date.now();
   const last = lastActionByIp.get(ip) || 0;
   if (now - last < RATE_MS) return Math.ceil((RATE_MS - (now - last)) / 1000);
+  if (!lastActionByIp.has(ip) && lastActionByIp.size >= 5000) {
+    if (now >= nextActionCleanup) {
+      for (const [k, t] of lastActionByIp) if (now - t >= RATE_MS) lastActionByIp.delete(k);
+      nextActionCleanup = now + 1000;
+    }
+    if (lastActionByIp.size >= 5000) return Math.ceil(RATE_MS / 1000);
+  }
   lastActionByIp.set(ip, now);
-  if (lastActionByIp.size > 5000) for (const [k, t] of lastActionByIp) if (now - t > RATE_MS) lastActionByIp.delete(k);
   return 0;
 }
 
@@ -938,6 +976,7 @@ wss.on('connection', (ws, req) => {
   ws.on('message', (raw) => {
     let msg;
     try { msg = JSON.parse(raw); } catch { return; }
+    if (!msg || typeof msg !== 'object' || Array.isArray(msg)) return;
     if (msg.type === 'mtr') startDistributed(ws, session, msg.ip, msg.vantages);
     else if (msg.type === 'mtr-stop') stopMtr(session);
     else if (msg.type === 'sov') startSovScan(ws, session, msg.url);
@@ -996,7 +1035,7 @@ async function reverseDns(ip) {
 }
 
 function resolveNames(ips) {
-  return Promise.all([...new Set(ips)].filter((ip) => ip && !isPrivateIp(ip)).map(reverseDns));
+  return Promise.all([...new Set(ips)].filter(isPublicIp).map(reverseDns));
 }
 
 // Offline IP geolocation via bundled DB-IP Lite MMDB files (no runtime API
@@ -1103,10 +1142,27 @@ function geolocate(ips) {
   return out;
 }
 
+// Routes to public destinations can traverse private server/community networks.
+// Keep their hop positions and measurements, but never publish local addresses
+// or reverse-DNS names through either traceroute output format.
+function publicTraceHop(hop) {
+  if (!hop.host || isPublicIp(hop.host)) return hop;
+  return {
+    ...hop, host: null, rdns: null,
+    geo: { private: true, city: '', country: 'Private network', cc: '' },
+  };
+}
+
+// Bound live traces independently of per-IP cooldowns. Keep a stopped process
+// charged until its close event, and pending DNS charged until it settles.
+const MTR = { active: new Set(), maxActive: 8 };
 function stopMtr(session) {
   if (session.mtr) {
-    session.mtr.stopped = true;
-    if (session.mtr.proc) session.mtr.proc.kill('SIGKILL');
+    const state = session.mtr;
+    state.stopped = true;
+    clearTimeout(state.timer);
+    if (state.proc) state.proc.kill('SIGKILL');
+    else if (!state.resolving) MTR.active.delete(state);
     session.mtr = null;
   }
   if (session.reqs) {
@@ -1127,20 +1183,38 @@ async function startDistributed(ws, session, rawTarget, vantages) {
   if (!isValidHost(rawTarget)) {
     return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: `refused: "${String(rawTarget).slice(0, 64)}"` }));
   }
+  // Reject invalid literal targets cheaply, then charge before DNS so failed
+  // lookups cannot bypass the shared measurement cooldown.
+  if (net.isIP(rawTarget) && !isPublicIp(rawTarget)) {
+    return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'target must be a public IP' }));
+  }
+  const wait = rateLimit(session.ip);
+  if (wait) {
+    return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: `rate limited — one trace/check per ${RATE_MS / 1000}s (try again in ${wait}s)` }));
+  }
+  if (MTR.active.size >= MTR.maxActive) {
+    return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'busy — try again shortly' }));
+  }
+  const state = { stopped: false, resolving: true, proc: null, timer: null };
+  session.mtr = state;
+  MTR.active.add(state);
   logQuery('mtr', rawTarget, session.ip);
   // resolve to a public IP (v4 or v6) — agents require an IP and must never hit
   // private space. Hostnames prefer IPv4 for reachability, falling back to AAAA.
   let ip = rawTarget;
   if (!net.isIP(rawTarget)) {
     try { ip = (await lookupHost(rawTarget)).address; }
-    catch { return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'cannot resolve' })); }
+    catch { ip = null; }
+  }
+  state.resolving = false;
+  if (state.stopped || ws.readyState !== 1) { MTR.active.delete(state); return; }
+  if (!ip) {
+    stopMtr(session);
+    return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'cannot resolve' }));
   }
   if (!isPublicIp(ip)) {
+    stopMtr(session);
     return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: 'target must be a public IP' }));
-  }
-  const wait = rateLimit(session.ip);
-  if (wait) {
-    return ws.send(JSON.stringify({ type: 'mtr', source: 'local', done: true, error: `rate limited — one trace/check per ${RATE_MS / 1000}s (try again in ${wait}s)` }));
   }
 
   startMtr(ws, ip, session, 'local');
@@ -1166,22 +1240,38 @@ function requestAgentMtr(ws, session, agentId, ip) {
 
 async function handleAgentResult(agent, m) {
   const p = agentReplies.get(m.reqId);
-  if (!p) return;
+  if (!p || p.agentId !== agent.id) return;
   clearTimeout(p.timer);
   agentReplies.delete(m.reqId);
   const { ws } = p;
   if (ws.readyState !== 1) return;
   if (m.error) return ws.send(JSON.stringify({ type: 'mtr', source: agent.id, done: true, error: m.error }));
-  const hops = await enrichAgentHops(Array.isArray(m.hops) ? m.hops.slice(0, 40) : []);
-  ws.send(JSON.stringify({ type: 'mtr', source: agent.id, round: 1, hops, agent: publicAgent(agent), done: true }));
+  try {
+    const hops = await enrichAgentHops(Array.isArray(m.hops) ? m.hops.slice(0, 40) : []);
+    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'mtr', source: agent.id, round: 1, hops, agent: publicAgent(agent), done: true }));
+  } catch {
+    console.warn('agent trace enrichment failed');
+    if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'mtr', source: agent.id, done: true, error: 'trace failed' }));
+  }
 }
 
 // Server-side geo + reverse DNS for hops an agent reported numerically.
 async function enrichAgentHops(hops) {
-  const ips = hops.map((h) => h.host).filter(Boolean);
+  // A joined agent still supplies untrusted JSON. Keep only IP literals and
+  // finite measurements before DNS/geo enrichment or browser rendering.
+  const metric = (value, fallback = null) => typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : fallback;
+  const rows = hops.filter((h) => h && typeof h === 'object' && !Array.isArray(h)).map((h, index) => ({
+    idx: Number.isInteger(h.idx) && h.idx >= 1 && h.idx <= 255 ? h.idx : index + 1,
+    host: typeof h.host === 'string' && net.isIP(h.host) ? h.host : null,
+    loss: metric(h.loss, 0) <= 100 ? metric(h.loss, 0) : 0,
+    snt: Number.isSafeInteger(h.snt) && h.snt >= 0 ? h.snt : 0,
+    last: metric(h.last), avg: metric(h.avg), best: metric(h.best),
+    wrst: metric(h.wrst), stdev: metric(h.stdev),
+  }));
+  const ips = rows.map((h) => h.host).filter(Boolean);
   geolocate(ips);
   await resolveNames(ips);
-  return hops.map((h) => ({
+  return rows.map((h) => publicTraceHop({
     idx: h.idx, host: h.host || null,
     loss: h.loss ?? 0, snt: h.snt ?? 0, last: h.last ?? null, avg: h.avg ?? null,
     best: h.best ?? null, wrst: h.wrst ?? null, stdev: h.stdev ?? null,
@@ -1192,41 +1282,53 @@ async function enrichAgentHops(hops) {
 
 // Our own live MTR (looping). `source` tags messages so the UI can combine vantages.
 function startMtr(ws, ip, session, source = 'local') {
-  const state = { stopped: false, proc: null };
+  const state = session.mtr || { stopped: false, resolving: false, proc: null, timer: null };
   session.mtr = state;
+  MTR.active.add(state);
   ws.send(JSON.stringify({ type: 'mtr', source, start: true, target: ip }));
 
   let round = 0;
   const runRound = () => {
     if (state.stopped || ws.readyState !== 1) return;
-    const proc = spawn('mtr', ['--json', '-n', '-i', '0.5', '-c', '5', '-m', '30', '--', ip]);
+    let proc;
+    try { proc = spawn('mtr', ['--json', '-n', '-i', '0.5', '-c', '5', '-m', '30', '--', ip]); }
+    catch {
+      stopMtr(session);
+      return ws.send(JSON.stringify({ type: 'mtr', source, target: ip, done: true, error: 'trace failed' }));
+    }
     state.proc = proc;
     let out = '';
     proc.stdout.on('data', (d) => (out += d));
     proc.stderr.on('data', () => {});
-    proc.on('error', (e) => { if (!state.stopped) ws.send(JSON.stringify({ type: 'mtr', source, error: e.message, target: ip })); });
+    proc.on('error', () => {
+      state.stopped = true;
+      if (ws.readyState === 1) ws.send(JSON.stringify({ type: 'mtr', source, error: 'trace failed', done: true, target: ip }));
+    });
     proc.on('close', async () => {
-      if (state.stopped || ws.readyState !== 1) return;
+      state.proc = null;
+      if (state.stopped || ws.readyState !== 1) { MTR.active.delete(state); return; }
       let hubs = [];
       try { hubs = (JSON.parse(out).report || {}).hubs || []; } catch { /* partial */ }
       const ips = hubs.map((h) => h.host).filter((h) => h && h !== '???');
       const geo = geolocate(ips);
+      state.resolving = true;
       await resolveNames(ips);
+      state.resolving = false;
       const hops = hubs.map((h) => {
         const real = h.host && h.host !== '???';
-        return {
+        return publicTraceHop({
           idx: h.count, host: real ? h.host : null, rdns: real ? rdnsCache.get(h.host) || null : null,
           loss: h['Loss%'] ?? 0, snt: h.Snt ?? 0, last: h.Last ?? null, avg: h.Avg ?? null,
           best: h.Best ?? null, wrst: h.Wrst ?? null, stdev: h.StDev ?? null,
           geo: real ? geo[h.host] || null : null,
-        };
+        });
       });
       round += 1;
       if (!state.stopped && ws.readyState === 1) {
         ws.send(JSON.stringify({ type: 'mtr', source, target: ip, round, hops }));
-        if (round < 600) setTimeout(runRound, 250);
-        else ws.send(JSON.stringify({ type: 'mtr', source, target: ip, done: true }));
-      }
+        if (round < 600) state.timer = setTimeout(runRound, 250);
+        else { MTR.active.delete(state); ws.send(JSON.stringify({ type: 'mtr', source, target: ip, done: true })); }
+      } else MTR.active.delete(state);
     });
   };
   runRound();
@@ -1291,7 +1393,7 @@ function traceOnce(ip, { cycles = 3, maxHops = 30, timeoutMs = 12000 } = {}) {
       await resolveNames(hostIps);
       const hops = hubs.map((h) => {
         const real = h.host && h.host !== '???';
-        return { idx: h.count, host: real ? h.host : null, geo: real ? geoLookup(h.host) : null };
+        return publicTraceHop({ idx: h.count, host: real ? h.host : null, geo: real ? geoLookup(h.host) : null });
       });
       resolve({ ip, hops });
     });
@@ -1439,7 +1541,7 @@ function traceStream(ip, onUpdate, { cycles = 3, maxHops = 30, timeoutMs = 15000
     const kill = setTimeout(() => { try { proc.kill('SIGKILL'); } catch { /* gone */ } }, timeoutMs);
 
     const snapshot = () => [...hops.values()].sort((a, b) => a.idx - b.idx)
-      .map((h) => ({ idx: h.idx, host: h.host || null, last: h.last ?? null, geo: h.host ? geoLookup(h.host) : null }));
+      .map((h) => publicTraceHop({ idx: h.idx, host: h.host || null, last: h.last ?? null, geo: h.host ? geoLookup(h.host) : null }));
     const flush = () => { settle = null; if (!done) onUpdate(snapshot()); };
     const throttled = () => { if (!settle) settle = setTimeout(flush, 140); };
 

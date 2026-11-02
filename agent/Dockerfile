@@ -20,10 +20,11 @@ COPY package*.json ./
 RUN --mount=type=secret,id=proxy_ca \
     if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; \
     npm ci --omit=dev
-COPY agent.js ./
+COPY agent.js healthcheck.js ./
 RUN chown -R node:node /app
 
 # Run unprivileged.
 ENV NODE_ENV=production
 USER node
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["node", "healthcheck.js"]
 CMD ["node", "agent.js"]

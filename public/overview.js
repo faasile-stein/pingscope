@@ -42,7 +42,7 @@ class Overview {
     this.legend = document.createElement('div');
     this.legend.className = 'ov-legend';
     this.legend.innerHTML = '<span>packet loss</span>'
-      + '<i style="background:linear-gradient(90deg,#2ecc40,#ffdc00,#ff851b,#ff4136,#b10dc9)"></i>'
+      + '<i></i>'
       + '<span class="ov-lg0">0%</span><span class="ov-lg1">100%</span>';
   }
   setLiveWindow(sec) { this.live = true; this.spanMs = sec * 1000; }
@@ -98,14 +98,17 @@ class Overview {
     // all interpolated values are numeric; route them through esc() anyway so
     // nothing reaches innerHTML unsanitised
     cell.now.innerHTML = last
-      ? `<b style="color:rgb(${esc(lossRGB(last.loss).join(','))})">${esc(ms(last.median))}</b>${last.loss > 0 ? ` <i>${esc(Math.round(last.loss * 100))}%</i>` : ''}`
+      ? `<b>${esc(ms(last.median))}</b>${last.loss > 0 ? ` <i>${esc(Math.round(last.loss * 100))}%</i>` : ''}`
       : '<b>—</b>';
+    cell.now.querySelector('b').style.color = last ? `rgb(${lossRGB(last.loss).join(',')})` : '';
     const med = vis.filter((s) => s.median != null);
     const avg = med.length ? med.reduce((a, s) => a + s.median, 0) / med.length : null;
     const mx = vis.reduce((a, s) => Math.max(a, s.max ?? 0), 0) || null;
     const lossAvg = vis.length ? vis.reduce((a, s) => a + (s.loss || 0), 0) / vis.length : 0;
     cell.foot.innerHTML = `${flag(p.cc)} ${esc(p.anycast ? 'anycast' : (p.net || '—'))}`
-      + ` · avg ${ms(avg)} · max ${ms(mx)} · <span class="ov-loss" style="color:rgb(${lossRGB(lossAvg).join(',')})">${Math.round(lossAvg * 100)}% loss</span>`;
+      + ` · avg ${ms(avg)} · max ${ms(mx)} · <span class="ov-loss">${Math.round(lossAvg * 100)}% loss</span>`;
+
+    cell.foot.querySelector('.ov-loss').style.color = `rgb(${lossRGB(lossAvg).join(',')})`;
 
     const plotW = cw - PADL - PADR, plotH = ch - PADT - PADB;
     const X = (t) => PADL + plotW - ((now - t) / span) * plotW;

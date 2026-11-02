@@ -10,22 +10,21 @@
   <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
   <link rel="icon" href="./favicon.ico" sizes="32x32" />
   <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-  <link rel="preconnect" href="https://unpkg.com" />
   <link rel="stylesheet" href="./styles.css" />
   <script type="importmap" nonce="__CSP_NONCE__">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      "three": "/vendor/three/build/three.module.js",
+      "three/addons/": "/vendor/three/addons/"
     }
   }
   </script>
 </head>
 <body>
   <canvas id="scene"></canvas>
-  <canvas id="globe" class="globe-canvas" style="display:none"></canvas>
-  <div id="globe-labels" class="globe-labels" style="display:none"></div>
-  <div id="globe-hud" class="globe-hud" style="display:none">
+  <canvas id="globe" class="globe-canvas initially-hidden"></canvas>
+  <div id="globe-labels" class="globe-labels initially-hidden"></div>
+  <div id="globe-hud" class="globe-hud initially-hidden">
     <div class="gh-row"><span class="gh-grad"></span> loss&nbsp;0→100%</div>
     <div class="gh-row"><span class="gh-w"></span> line width = latency variance</div>
     <div class="gh-row gh-tip">◉ this server · click a line for its MTR</div>
@@ -99,7 +98,7 @@
   </div>
 
   <!-- "show all" — 2D SmokePing-style small-multiples grid -->
-  <div id="overview" class="overview" style="display:none"></div>
+  <div id="overview" class="overview initially-hidden"></div>
 
   <section id="mtrpanel">
     <div class="mtr-head">
@@ -152,7 +151,7 @@
         <button id="sov-close" class="sov-close" title="close">✕</button>
       </div>
       <div id="sov-body" class="sov-body"><div class="sov-loading">scanning…</div></div>
-      <div class="sov-note">Score = hosting jurisdiction (70%) + transit route (30%). Sovereign = EU-27 + Switzerland, UK &amp; Iceland. A server hosted in the sovereign area but owned by a company outside it (e.g. subject to the US CLOUD Act) counts <b>half</b>. Geo &amp; ownership estimated from public IP / AS registry. <a href="/sovereignty" style="color:var(--accent);text-decoration:none">full method &amp; the debate →</a></div>
+      <div class="sov-note">Score = hosting jurisdiction (70%) + transit route (30%). Sovereign = EU-27 + Switzerland, UK &amp; Iceland. A server hosted in the sovereign area but owned by a company outside it (e.g. subject to the US CLOUD Act) counts <b>half</b>. Geo &amp; ownership estimated from public IP / AS registry. <a href="/sovereignty" class="sov-method-link">full method &amp; the debate →</a></div>
     </div>
   </div>
 

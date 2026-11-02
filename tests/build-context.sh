@@ -7,7 +7,7 @@ pingscope_scratch=$(mktemp -d /tmp/pingscope-context-test.XXXXXX)
 trap 'rm -rf "$pingscope_scratch"' EXIT
 mkdir -p "$pingscope_scratch/context/agent" "$pingscope_scratch/context/nested/deeper"
 cp "$pingscope_root/.dockerignore" "$pingscope_scratch/context/.dockerignore"
-cp "$pingscope_root/history-reader.js" "$pingscope_root/history-worker.js" "$pingscope_scratch/context/"
+cp "$pingscope_root/history-reader.js" "$pingscope_root/history-worker.js" "$pingscope_root/history-budget.js" "$pingscope_root/healthcheck.js" "$pingscope_scratch/context/"
 printf 'ordinary configuration\n' > "$pingscope_scratch/context/keep.txt"
 pingscope_env_files=(.env .env.local .env.production agent/.env agent/.env.production nested/deeper/.env.local)
 for pingscope_file in "${pingscope_env_files[@]}"; do
@@ -35,4 +35,6 @@ test "$pingscope_leaked" -eq 0
 cmp "$pingscope_scratch/context/keep.txt" "$pingscope_scratch/output/app/keep.txt"
 cmp "$pingscope_root/history-reader.js" "$pingscope_scratch/output/app/history-reader.js"
 cmp "$pingscope_root/history-worker.js" "$pingscope_scratch/output/app/history-worker.js"
+cmp "$pingscope_root/history-budget.js" "$pingscope_scratch/output/app/history-budget.js"
+cmp "$pingscope_root/healthcheck.js" "$pingscope_scratch/output/app/healthcheck.js"
 printf 'Docker context excludes all six environment canaries and preserves runtime modules/control.\n'

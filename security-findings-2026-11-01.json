@@ -1,0 +1,1971 @@
+{
+  "handoff_generated_at": "2026-11-01T05:20:39.256670+00:00",
+  "base_commit": "1fa08b8897098dbd27c02894f25721061db6f539",
+  "branch": "main",
+  "initial_worktree": "clean",
+  "scope_count": 74,
+  "work_groups": 65,
+  "summary": {
+    "not reproducible": 41,
+    "needs information": 1,
+    "fixed": 32
+  },
+  "verification_commands": [
+    {
+      "command": "PATH=/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH node --experimental-sqlite --test tests/backend-controls.test.js tests/frontend-security.test.js",
+      "outcome": "15 tests passed, 0 failed before adding tests."
+    },
+    {
+      "command": "PATH=/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH node --experimental-sqlite --test tests/source-review.test.js tests/backend-controls.test.js tests/frontend-security.test.js",
+      "outcome": "17 tests passed, 0 failed; TAP duration 543.219845 ms; Node experimental SQLite and VM Promise deprecation warnings only."
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "exit 0; no whitespace errors."
+    },
+    {
+      "command": "/home/stein/.nvm/versions/node/v22.23.4/bin/node --test tests/healthcheck.test.js",
+      "phase": "before implementation",
+      "outcome": "exit 1; 3 failed: both Dockerfiles lacked HEALTHCHECK and agent lacked registration heartbeat state"
+    },
+    {
+      "command": "/home/stein/.nvm/versions/node/v22.23.4/bin/node --test tests/healthcheck.test.js tests/build-security.test.js",
+      "phase": "after implementation and control additions",
+      "outcome": "exit 0; 10 tests passed, 0 failed, ~291 ms; HTTP 200/503/refused-connection controls, fresh/missing/stale/malformed agent heartbeat and welcome/pong/reject/disconnect controls; fail-closed npm ci; committed ws integrity; digest controls"
+    },
+    {
+      "command": "docker build --check .",
+      "outcome": "exit 0; pinned image metadata resolved, check complete with no warnings"
+    },
+    {
+      "command": "docker build --check agent/",
+      "outcome": "exit 0; pinned image metadata resolved, check complete with no warnings"
+    },
+    {
+      "command": "bash tests/build-context.sh",
+      "outcome": "exit 0; six environment canaries excluded; normal file, history modules and new healthcheck.js retained"
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "exit 0; no whitespace errors"
+    },
+    {
+      "command": "docker image inspect node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da --format {{.Id}}",
+      "outcome": "exit 1; full base image not installed locally; no production or full runtime image launched"
+    },
+    {
+      "command": "/home/stein/.nvm/versions/node/v22.23.4/bin/node --experimental-sqlite --test tests/csp-review.test.js",
+      "stage": "before changes",
+      "outcome": "2 passed, 2 failed: CDN script source and unsafe-inline style permission reproduced; headers and escaped 404 controls passed"
+    },
+    {
+      "command": "env PATH=\"/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH\" npm view three@0.160.0 version dist.integrity",
+      "outcome": "Verified version 0.160.0 and SHA-512 registry integrity"
+    },
+    {
+      "command": "env PATH=\"/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH\" npm install --save-exact --ignore-scripts three@0.160.0",
+      "outcome": "Added one package; audited 75 packages, 0 vulnerabilities reported; no other package versions changed"
+    },
+    {
+      "command": "/home/stein/.nvm/versions/node/v22.23.4/bin/node --experimental-sqlite --test tests/csp-review.test.js tests/security-headers.test.js tests/frontend-security.test.js",
+      "stage": "after changes",
+      "outcome": "16 passed, 0 failed"
+    },
+    {
+      "command": "PINGSCOPE_CHROMIUM=/home/stein/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome /home/stein/.nvm/versions/node/v22.23.4/bin/node --experimental-sqlite tests/browser-csp.cjs",
+      "outcome": "Initial harness asserted graph was default, but app defaults to globe; corrected control to verify default globe, then explicitly switch to graph. Final run passed hostile CSS/script blocking and all valid UI controls; no application bug was involved in that assertion."
+    },
+    {
+      "command": "git diff --check",
+      "outcome": "exit 0"
+    },
+    {
+      "command": "/home/stein/.nvm/versions/node/v22.23.4/bin/node --experimental-sqlite --test tests/csp-review.test.js",
+      "stage": "before generic404 change",
+      "outcome": "3 passed, 1 failed: default Express Cannot GET template reproduced; negative known-route controls retained"
+    },
+    {
+      "command": "/home/stein/.nvm/versions/node/v22.23.4/bin/node --experimental-sqlite --test tests/csp-review.test.js tests/security-headers.test.js tests/frontend-security.test.js",
+      "stage": "final after generic404",
+      "outcome": "16 passed, 0 failed"
+    },
+    {
+      "command": "PINGSCOPE_CHROMIUM=/home/stein/.cache/ms-playwright/chromium-1234/chrome-linux64/chrome /home/stein/.nvm/versions/node/v22.23.4/bin/node --experimental-sqlite tests/browser-csp.cjs",
+      "stage": "final after generic404",
+      "outcome": "Passed. Browser attack fixtures are supplied through local CDP interception with actual emitted policy, not added application routes. Initial rerun exposed test-data timing: overview rendered before live sample delivery; fixed fixture by seeding history before browser connection and waiting for actual rendered condition. No app bug involved."
+    },
+    {
+      "command": "PATH=/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH node --experimental-sqlite --test tests/history-budget.test.js tests/healthcheck.test.js",
+      "outcome": "Initial review: 5 tests passed. Raw X-Forwarded-For budget bypass identified and reported."
+    },
+    {
+      "command": "PATH=/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH node --experimental-sqlite --test tests/history-budget.test.js",
+      "outcome": "After req.ip/explicit TRUST_PROXY correction and new SQLite fixture: 4 tests passed, 0 failed; TAP duration 1096.848792 ms."
+    },
+    {
+      "command": "env PATH=\"/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH\" npm test",
+      "phase": "baseline before changes",
+      "outcome": "30 passed, 0 failed, 0 skipped; 2317.193204ms"
+    },
+    {
+      "command": "env PATH=\"/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH\" node --experimental-sqlite --test tests/history-budget.test.js",
+      "phase": "before budget implementation",
+      "outcome": "2 failed: repeated large query200 instead of429, budget module absent"
+    },
+    {
+      "command": "env PATH=\"/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH\" node --experimental-sqlite --test tests/api-surface.test.js",
+      "outcome": "3 passed,0failed; documented target contract, catalog/agent privacy, all reported REST guesses and actual WebSocket controls"
+    },
+    {
+      "command": "env PATH=\"/home/stein/.nvm/versions/node/v22.23.4/bin:$PATH\" npm test",
+      "phase": "final integrated checkout",
+      "outcome": "49 passed,0failed,0skipped;2464.55357ms. HTTP native SQLite deadline controls settled in54.4ms at50ms fixture deadline; real bulk11031257bytes then429; selectedtarget137081bytes200"
+    },
+    {
+      "command": "git diff --check && docker build --check . && docker build --check agent/ && bash tests/build-context.sh",
+      "phase": "final integrated checkout",
+      "outcome": "exit0; both Docker checks without warnings, six env canaries excluded and history-reader/history-worker/history-budget/healthcheck included by content comparison"
+    }
+  ],
+  "findings": [
+    {
+      "result_id": "res_01a192533a1ae12f6b3e5e66df04",
+      "group": 1,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history",
+        "server.js:history handler",
+        "history-reader.js",
+        "history-worker.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "README.md"
+      ],
+      "reason": "Existing fix at starting HEAD bounds buckets to 10..1000, deduplicates catalog IDs, validates safe integer ranges and isolates SQLite aggregation in one read-only worker with at most eight pending requests and a five-second deadline. Current tests reconfirm these controls; this review adds a weighted response budget. Historical live DoS has not been rerun or declared resolved.",
+      "verification": "Seven existing real-SQLite history tests pass, including buckets=999999999 vs buckets=20, invalid ranges, queue saturation, active/queued deadlines and concurrent /api/probes availability. Baseline 50ms deadline fixture settled both responses in 54.3ms; ordinary work recovered after worker termination.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding.",
+      "callback_action": null,
+      "callback_reason": "Existing fix at starting HEAD bounds buckets to 10..1000, deduplicates catalog IDs, validates safe integer ranges and isolates SQLite aggregation in one read-only worker with at most eight pending requests and a five-second deadline. Current tests reconfirm these controls; this review adds a weighted response budget. Historical live DoS has not been rerun or declared resolved.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed3514529beec624915a61",
+      "group": 2,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed35001a3c764092e129e2",
+      "group": 3,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d15b8880f0b4d0f667d",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:537-552 (xmlEsc, cleanTarget, ogTags)",
+        "server.js:584-607 (/og)"
+      ],
+      "reason": "The reported /og SVG interpolation is not an unencoded request host: headline and sub are passed through xmlEsc; target is additionally restricted by cleanTarget and n is coerced and clamped to 1..99. SVG geometry is derived solely from fixed array indices and constant colors. backend-controls hostile </text><script> query produces no script element and a valid example.com/n=2 control preserves the expected headline and seven circles. No attacker text reaches an executable HTML/SVG context at this sink.",
+      "verification": "backend-controls: SVG previews use escaped text, clamped scores and constant numeric geometry; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 4,
+      "affected": [
+        "server.js:537-552 (xmlEsc, cleanTarget, ogTags)",
+        "server.js:584-607 (/og)"
+      ],
+      "callback_reason": "The reported /og SVG interpolation is not an unencoded request host: headline and sub are passed through xmlEsc; target is additionally restricted by cleanTarget and n is coerced and clamped to 1..99. SVG geometry is derived solely from fixed array indices and constant colors. backend-controls hostile </text><script> query produces no script element and a valid example.com/n=2 control preserves the expected headline and seven circles. No attacker text reaches an executable HTML/SVG context at this sink.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d3d5356b79ea23151b3",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:973-978 (isValidHost)",
+        "server.js:1122-1143 (startDistributed)"
+      ],
+      "reason": "isValidHost rejects nonstrings, empty strings and inputs exceeding 253 characters before net.isIP or the hostname regex. Dot-delimited labels have a bounded maximum size and cannot consume separators. backend-controls accepts normal domains, IPv4/IPv6 and 253-character hostname controls, rejects malformed and 100,000-character values, and completes 10,000 adversarial maximum-length near-matches. The network MTR path calls this guard before DNS and spawn; no catastrophic-regex path is demonstrated.",
+      "verification": "backend-controls: host validator bounds input before the domain regex, with valid and near-match controls; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 5,
+      "affected": [
+        "server.js:973-978 (isValidHost)",
+        "server.js:1122-1143 (startDistributed)"
+      ],
+      "callback_reason": "isValidHost rejects nonstrings, empty strings and inputs exceeding 253 characters before net.isIP or the hostname regex. Dot-delimited labels have a bounded maximum size and cannot consume separators. backend-controls accepts normal domains, IPv4/IPv6 and 253-character hostname controls, rejects malformed and 100,000-character values, and completes 10,000 adversarial maximum-length near-matches. The network MTR path calls this guard before DNS and spawn; no catastrophic-regex path is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d472fc7146edf67d0cf",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [
+        "tests/source-review.test.js"
+      ],
+      "evidence_refs": [
+        "server.js:1304-1317 (DOMAIN_RE, parseSiteHost)"
+      ],
+      "reason": "DOMAIN_RE begins with a 4..253-character anchored length lookahead. Its repeated label character classes cannot consume dot separators, so label partitions are not ambiguous; each label is itself bounded to 63 characters. source-review tests invoke the actual backend parseSiteHost with valid domains including a 253-character control, oversized inputs up to one million characters, malformed labels, and 20,000 maximum-length near-match evaluations under a one-second VM deadline. All complete and reject malformed inputs; the claimed catastrophic backtracking is not reproducible.",
+      "verification": "source-review: backend domain parser accepts normal domains and bounds adversarial regex near-matches; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 5,
+      "affected": [
+        "server.js:1304-1317 (DOMAIN_RE, parseSiteHost)"
+      ],
+      "callback_reason": "DOMAIN_RE begins with a 4..253-character anchored length lookahead. Its repeated label character classes cannot consume dot separators, so label partitions are not ambiguous; each label is itself bounded to 63 characters. source-review tests invoke the actual backend parseSiteHost with valid domains including a 253-character control, oversized inputs up to one million characters, malformed labels, and 20,000 maximum-length near-match evaluations under a one-second VM deadline. All complete and reject malformed inputs; the claimed catastrophic backtracking is not reproducible.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713cb7e7b47be894b2c847",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:358-385 (recoverCorruptRanking)",
+        "server.js:206 (DB_PATH configuration)"
+      ],
+      "reason": "The path.join argument comes from fs.readdirSync(path.dirname(DB_PATH)), filtered for the configured database basename plus .corrupt-. DB_PATH is operator process configuration, not HTTP input; filesystem directory-entry names cannot contain path separators. The startup recovery function has no route taking filenames. backend-controls creates a local backup fixture and confirms recovery/rename succeeds; a traversal-shaped target query is rejected with 404. Exploitation would require independent local filesystem/configuration control, not the reported remote user input flow.",
+      "verification": "backend-controls: backup recovery paths come from local directory entries, and normal backups recover; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 6,
+      "affected": [
+        "server.js:358-385 (recoverCorruptRanking)",
+        "server.js:206 (DB_PATH configuration)"
+      ],
+      "callback_reason": "The path.join argument comes from fs.readdirSync(path.dirname(DB_PATH)), filtered for the configured database basename plus .corrupt-. DB_PATH is operator process configuration, not HTTP input; filesystem directory-entry names cannot contain path separators. The startup recovery function has no route taking filenames. backend-controls creates a local backup fixture and confirms recovery/rename succeeds; a traversal-shaped target query is rejected with 404. Exploitation would require independent local filesystem/configuration control, not the reported remote user input flow.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713cc2a638283f00eaa183",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:395-455 (salvageSamples)",
+        "server.js:206 (DB_PATH configuration)"
+      ],
+      "reason": "The path.join argument comes exclusively from fs.readdirSync(path.dirname(DB_PATH)), filtered for the operator-configured DB basename plus .imported- or .samples-src-. Directory-entry names contain no slash; no HTTP request controls this enumeration or DB_PATH. backend-controls recovers a fixture backup, salvages its samples, verifies the final rename and row count, and rejects a traversal-shaped target with 404. Local write/symlink authority over the database directory would be a separate trust condition, not the claimed request-path traversal.",
+      "verification": "backend-controls: backup recovery paths come from local directory entries, and normal backups recover; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 6,
+      "affected": [
+        "server.js:395-455 (salvageSamples)",
+        "server.js:206 (DB_PATH configuration)"
+      ],
+      "callback_reason": "The path.join argument comes exclusively from fs.readdirSync(path.dirname(DB_PATH)), filtered for the operator-configured DB basename plus .imported- or .samples-src-. Directory-entry names contain no slash; no HTTP request controls this enumeration or DB_PATH. backend-controls recovers a fixture backup, salvages its samples, verifies the final rename and row count, and rejects a traversal-shaped target with 404. Local write/symlink authority over the database directory would be a separate trust condition, not the claimed request-path traversal.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713cdda823f806eaf01dc6",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [
+        "tests/source-review.test.js"
+      ],
+      "evidence_refs": [
+        "server.js:537-552 (xmlEsc, ogTags)",
+        "server.js:555-580 (root route)",
+        "server.js:665-690 (sovereignty route)"
+      ],
+      "reason": "Every variable interpolated into ogTags content attributes passes through xmlEsc, including request-derived Host values used in URL/image fields. backend-controls verifies all seven dynamic metadata fields encode quotes, angle brackets, ampersands and apostrophes and that a hostile Host header cannot inject an img element. source-review additionally checks the sovereignty share route with hostile host/domain/score values and a normal example.com/80/90 control. These template literals already perform context-appropriate HTML attribute encoding.",
+      "verification": "backend-controls metadata test and source-review sovereignty-share test; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 7,
+      "affected": [
+        "server.js:537-552 (xmlEsc, ogTags)",
+        "server.js:555-580 (root route)",
+        "server.js:665-690 (sovereignty route)"
+      ],
+      "callback_reason": "Every variable interpolated into ogTags content attributes passes through xmlEsc, including request-derived Host values used in URL/image fields. backend-controls verifies all seven dynamic metadata fields encode quotes, angle brackets, ampersands and apostrophes and that a hostile Host header cannot inject an img element. source-review additionally checks the sovereignty share route with hostile host/domain/score values and a normal example.com/80/90 control. These template literals already perform context-appropriate HTML attribute encoding.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713cf10d9375412271ab06",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [
+        "tests/source-review.test.js"
+      ],
+      "evidence_refs": [
+        "server.js:537-552 (xmlEsc, ogTags)",
+        "server.js:555-580 (root route)",
+        "server.js:665-690 (sovereignty route)"
+      ],
+      "reason": "Every variable interpolated into ogTags content attributes passes through xmlEsc, including request-derived Host values used in URL/image fields. backend-controls verifies all seven dynamic metadata fields encode quotes, angle brackets, ampersands and apostrophes and that a hostile Host header cannot inject an img element. source-review additionally checks the sovereignty share route with hostile host/domain/score values and a normal example.com/80/90 control. These template literals already perform context-appropriate HTML attribute encoding.",
+      "verification": "backend-controls metadata test and source-review sovereignty-share test; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 7,
+      "affected": [
+        "server.js:537-552 (xmlEsc, ogTags)",
+        "server.js:555-580 (root route)",
+        "server.js:665-690 (sovereignty route)"
+      ],
+      "callback_reason": "Every variable interpolated into ogTags content attributes passes through xmlEsc, including request-derived Host values used in URL/image fields. backend-controls verifies all seven dynamic metadata fields encode quotes, angle brackets, ampersands and apostrophes and that a hostile Host header cannot inject an img element. source-review additionally checks the sovereignty share route with hostile host/domain/score values and a normal example.com/80/90 control. These template literals already perform context-appropriate HTML attribute encoding.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713cff73180611cc0577fe",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:584-607 (/og SVG route)"
+      ],
+      "reason": "The flagged circle/path template values are computed from seven fixed array indices, arithmetic, fixed M/L commands and constant colors; no request text flows into geometry. Other text in this SVG uses xmlEsc after cleanTarget, and vantage count is numeric and clamped. backend-controls confirms hostile SVG/script input produces no script markup and retains seven circles; normal example.com/n=2 produces the expected content. Template syntax alone does not establish XSS.",
+      "verification": "backend-controls: SVG previews use escaped text, clamped scores and constant numeric geometry; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 7,
+      "affected": [
+        "server.js:584-607 (/og SVG route)"
+      ],
+      "callback_reason": "The flagged circle/path template values are computed from seven fixed array indices, arithmetic, fixed M/L commands and constant colors; no request text flows into geometry. Other text in this SVG uses xmlEsc after cleanTarget, and vantage count is numeric and clamped. backend-controls confirms hostile SVG/script input produces no script markup and retains seven circles; normal example.com/n=2 produces the expected content. Template syntax alone does not establish XSS.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d0717a823434fe55e7e",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:584-607 (/og SVG route)"
+      ],
+      "reason": "The flagged circle/path template values are computed from seven fixed array indices, arithmetic, fixed M/L commands and constant colors; no request text flows into geometry. Other text in this SVG uses xmlEsc after cleanTarget, and vantage count is numeric and clamped. backend-controls confirms hostile SVG/script input produces no script markup and retains seven circles; normal example.com/n=2 produces the expected content. Template syntax alone does not establish XSS.",
+      "verification": "backend-controls: SVG previews use escaped text, clamped scores and constant numeric geometry; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 7,
+      "affected": [
+        "server.js:584-607 (/og SVG route)"
+      ],
+      "callback_reason": "The flagged circle/path template values are computed from seven fixed array indices, arithmetic, fixed M/L commands and constant colors; no request text flows into geometry. Other text in this SVG uses xmlEsc after cleanTarget, and vantage count is numeric and clamped. backend-controls confirms hostile SVG/script input produces no script markup and retains seven circles; normal example.com/n=2 produces the expected content. Template syntax alone does not establish XSS.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d1da3d7b5a2965a8463",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [
+        "tests/source-review.test.js"
+      ],
+      "evidence_refs": [
+        "server.js:613-649 (clampScore, sovOgSvg)",
+        "server.js:653-657 (/og/sovereignty)"
+      ],
+      "reason": "sovOgSvg has one production caller: /og/sovereignty passes a cleanTarget domain and clampScore-normalized web/mail numbers. The domain is xmlEsc-encoded again inside sovOgSvg. Tile labels/fonts/coordinates are fixed call-site constants, verdict is a fixed string selection, and colors derive from clamped numeric scores. backend-controls verifies encoded hostile text, null rejected score, a capped 100 score and successful PNG response; normal share-score controls pass. Untrusted raw HTML cannot enter the flagged tile or overall SVG templates.",
+      "verification": "backend-controls SVG preview/PNG test and source-review sovereignty-share controls; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 7,
+      "affected": [
+        "server.js:613-649 (clampScore, sovOgSvg)",
+        "server.js:653-657 (/og/sovereignty)"
+      ],
+      "callback_reason": "sovOgSvg has one production caller: /og/sovereignty passes a cleanTarget domain and clampScore-normalized web/mail numbers. The domain is xmlEsc-encoded again inside sovOgSvg. Tile labels/fonts/coordinates are fixed call-site constants, verdict is a fixed string selection, and colors derive from clamped numeric scores. backend-controls verifies encoded hostile text, null rejected score, a capped 100 score and successful PNG response; normal share-score controls pass. Untrusted raw HTML cannot enter the flagged tile or overall SVG templates.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d26126fa1905e7408ba",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [
+        "tests/source-review.test.js"
+      ],
+      "evidence_refs": [
+        "server.js:613-649 (clampScore, sovOgSvg)",
+        "server.js:653-657 (/og/sovereignty)"
+      ],
+      "reason": "sovOgSvg has one production caller: /og/sovereignty passes a cleanTarget domain and clampScore-normalized web/mail numbers. The domain is xmlEsc-encoded again inside sovOgSvg. Tile labels/fonts/coordinates are fixed call-site constants, verdict is a fixed string selection, and colors derive from clamped numeric scores. backend-controls verifies encoded hostile text, null rejected score, a capped 100 score and successful PNG response; normal share-score controls pass. Untrusted raw HTML cannot enter the flagged tile or overall SVG templates.",
+      "verification": "backend-controls SVG preview/PNG test and source-review sovereignty-share controls; passed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 7,
+      "affected": [
+        "server.js:613-649 (clampScore, sovOgSvg)",
+        "server.js:653-657 (/og/sovereignty)"
+      ],
+      "callback_reason": "sovOgSvg has one production caller: /og/sovereignty passes a cleanTarget domain and clampScore-normalized web/mail numbers. The domain is xmlEsc-encoded again inside sovOgSvg. Tile labels/fonts/coordinates are fixed call-site constants, verdict is a fixed string selection, and colors derive from clamped numeric scores. backend-controls verifies encoded hostile text, null rejected score, a capped 100 score and successful PNG response; normal share-score controls pass. Untrusted raw HTML cannot enter the flagged tile or overall SVG templates.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713b8ec15001578d123c2e",
+      "group": 8,
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/build-security.test.js"
+      ],
+      "affected": [
+        "package.json:dependencies.ws",
+        "package-lock.json:packages[node_modules/ws]",
+        "Dockerfile:60-62"
+      ],
+      "verification": "The cited ws range is present, but the committed lockfile fixes ws 8.22.0 to its registry URL and sha512 integrity. Docker installs via npm ci, with no range-resolving fallback. Tests validate the real lock entry and missing-entry control, and execute the Docker RUN command with npm success/failure fixtures. All pass.",
+      "callback_action": "ignore",
+      "callback_reason": "Current checkout already supplies the mitigation in the rule: package-lock.json packages[node_modules/ws] fixes ws at 8.22.0 with resolved registry URL and sha512 integrity, matching package.json dependencies.ws. Dockerfile uses npm ci --omit=dev with no npm-install fallback. tests/build-security.test.js verifies the actual lock entry, a missing-entry negative control, and that npm ci failure fails the build. These tests passed. A ranged manifest alone does not establish dependency hijacking with this locked build path.",
+      "remaining_action": "Continue npm ci builds; investigate any actual compromised artifact evidence separately.",
+      "reason": "The cited ws range is present, but the committed lockfile fixes ws 8.22.0 to its registry URL and sha512 integrity. Docker installs via npm ci, with no range-resolving fallback. Tests validate the real lock entry and missing-entry control, and execute the Docker RUN command with npm success/failure fixtures. All pass.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d3033e08c3874ef23aa",
+      "group": 9,
+      "disposition": "needs information",
+      "files_changed": [],
+      "affected": [
+        "server.js:http.createServer(app), main/server.listen, explicit TRUST_PROXY",
+        "docker-compose.yml:5-6",
+        "README.md:Security regression checks"
+      ],
+      "verification": "Source does use plaintext Node HTTP and trusts the documented Bootload TLS proxy. Local tests exercise HTTP. The quickstart Compose file publishes 3000 on all interfaces; that is not proof production exposes it. The repository does not contain the active deployment ingress/TLS/firewall configuration, so the TLS-termination compensating control cannot be independently verified. No production probes were run.",
+      "callback_action": null,
+      "remaining_action": "Supply current deployed proxy/ingress and backend exposure/firewall configuration plus deployed revision; verify public HTTP redirects to HTTPS and backend 3000 is private in an authorized retest. No disposition callback until verified.",
+      "reason": "Node intentionally serves HTTP for local development and TLS termination at an ingress. The active production ingress, backend exposure/firewall configuration and deployed revision are not in this checkout. Compose publishes port3000 on all interfaces; that alone does not prove the production backend is exposed. Requested this context from the owner. No production probes or callback were performed. New TRUST_PROXY defaults to no trusted HTTP forwarding, with exact proxy IP/CIDR configuration required behind an ingress.",
+      "callback_reason": "Source does use plaintext Node HTTP and trusts the documented Bootload TLS proxy. Local tests exercise HTTP. The quickstart Compose file publishes 3000 on all interfaces; that is not proof production exposes it. The repository does not contain the active deployment ingress/TLS/firewall configuration, so the TLS-termination compensating control cannot be independently verified. No production probes were run.",
+      "callback_outcome": "not sent: investigation needs deployment information",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed350d512275e223bc1975",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 10,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192533a3f46e715b60f1a4819",
+      "group": 11,
+      "disposition": "fixed",
+      "affected": [
+        "WebSocket upgrade /",
+        "server.js:allowedBrowserOrigin, upgrade, startDistributed"
+      ],
+      "files_changed": [],
+      "reason": "Existing fix at starting HEAD rejects foreign, null and malformed browser Origins before upgrade, preserving same-origin and Originless native clients. The app is public and does not rely on browser session cookies; the concrete risk was spending visitor trace budgets from another origin. The authenticated /agent protocol remains separate.",
+      "verification": "backend-websocket tests pass: 403 for attacker/null/malformed Origins, 101 for same-origin/native and trusted HTTPS proxy controls; invalid agent hello rejected. API-surface tests prove MTR messages reject command metacharacters and private IPs before a stubbed public-IP spawn.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding.",
+      "callback_action": null,
+      "callback_reason": "Existing fix at starting HEAD rejects foreign, null and malformed browser Origins before upgrade, preserving same-origin and Originless native clients. The app is public and does not rely on browser session cookies; the concrete risk was spending visitor trace budgets from another origin. The authenticated /agent protocol remains separate.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ebe8b2cd4ad822d1409",
+      "group": 12,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81eabdc85bfdb26972a25",
+      "group": 13,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/history?id=... or ?host=...",
+        "server.js:history handler",
+        "README.md:How it works",
+        "public/app.js:history fetches"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js",
+        "README.md"
+      ],
+      "reason": "The documented query selector is target, not id, probe or host. Both frontend callers use target; absent target deliberately selects all configured public targets. Guessed parameters never enter DNS or a child-process sink. Two-target SQLite controls prove each supported target selects its own data and nonexistent target returns404, while id=fixture-a/id=nonexistent/probe/host=;id requests match the intentionally public all-target response. There is no authenticated per-probe boundary or demonstrated parameter injection.",
+      "verification": "tests/api-surface.test.js passes guessed-parameter, supported-selector, unknown-target and zero DNS/spawn controls.",
+      "remaining_action": "ignore callback for the demonstrated inapplicable parameter contract; use documented target selector. No alias or authentication change.",
+      "callback_action": "ignore",
+      "callback_reason": "The documented query selector is target, not id, probe or host. Both frontend callers use target; absent target deliberately selects all configured public targets. Guessed parameters never enter DNS or a child-process sink. Two-target SQLite controls prove each supported target selects its own data and nonexistent target returns404, while id=fixture-a/id=nonexistent/probe/host=;id requests match the intentionally public all-target response. There is no authenticated per-probe boundary or demonstrated parameter injection.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81eb2f659e8441a97fe23",
+      "group": 14,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/history?id=... or ?host=...",
+        "server.js:history handler",
+        "README.md:How it works",
+        "public/app.js:history fetches"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js",
+        "README.md"
+      ],
+      "reason": "The documented query selector is target, not id, probe or host. Both frontend callers use target; absent target deliberately selects all configured public targets. Guessed parameters never enter DNS or a child-process sink. Two-target SQLite controls prove each supported target selects its own data and nonexistent target returns404, while id=fixture-a/id=nonexistent/probe/host=;id requests match the intentionally public all-target response. There is no authenticated per-probe boundary or demonstrated parameter injection.",
+      "verification": "tests/api-surface.test.js passes guessed-parameter, supported-selector, unknown-target and zero DNS/spawn controls.",
+      "remaining_action": "ignore callback for the demonstrated inapplicable parameter contract; use documented target selector. No alias or authentication change.",
+      "callback_action": "ignore",
+      "callback_reason": "The documented query selector is target, not id, probe or host. Both frontend callers use target; absent target deliberately selects all configured public targets. Guessed parameters never enter DNS or a child-process sink. Two-target SQLite controls prove each supported target selects its own data and nonexistent target returns404, while id=fixture-a/id=nonexistent/probe/host=;id requests match the intentionally public all-target response. There is no authenticated per-probe boundary or demonstrated parameter injection.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81eb8557344e2b654f347",
+      "group": 15,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee33b687654163cfa5437",
+      "group": 16,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed352e6b9f977914d020fb",
+      "group": 17,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed3529b9f6ea5d9d8449d8",
+      "group": 18,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed351fef11cdfc7eac5196",
+      "group": 19,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e11408bee548853a8c97",
+      "group": 20,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee30bb7c500964480193d",
+      "group": 21,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee2c8d247da34c56a2efa",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 22,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ec46aa69f5ed1b402a2",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 23,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed35241955df97f613d9bc",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 24,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee36b862ceafa99454250",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 25,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed351a26092df96d9f4197",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 26,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e11af6b8efe93d1ef487",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 27,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e10d02efc4a295629fc6",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 28,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e101a2fa00bfa715c730",
+      "group": 29,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed3532d1173df489ee8852",
+      "group": 30,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/history?from=0&to=99999999999999",
+        "history-reader.js:admission/deadline/restart",
+        "server.js:history503"
+      ],
+      "files_changed": [],
+      "reason": "503 with Retry-After is the explicit overload/deadline protection, not proof that a caller stalled unrelated APIs. Current code isolates synchronous SQLite in one worker, admits at most eight pending requests and includes queue time in a five-second deadline. The real local expensive-SQLite-view control forces active/queued503 responses while /api/probes returns200; normal history recovers after termination. A wide-range control also succeeds with bounded buckets. No additional denial of service follows from the reported single503. The historical actual-stall result is tracked separately, fixed locally awaiting retest.",
+      "verification": "All seven backend-history tests pass, including real native SQLite load, deadline, unrelated endpoint, and recovery controls.",
+      "remaining_action": "ignore callback for the unsupported inference from a protective503. Retest historical DoS separately after deployment.",
+      "callback_action": "ignore",
+      "callback_reason": "503 with Retry-After is the explicit overload/deadline protection, not proof that a caller stalled unrelated APIs. Current code isolates synchronous SQLite in one worker, admits at most eight pending requests and includes queue time in a five-second deadline. The real local expensive-SQLite-view control forces active/queued503 responses while /api/probes returns200; normal history recovers after termination. A wide-range control also succeeds with bounded buckets. No additional denial of service follows from the reported single503. The historical actual-stall result is tracked separately, fixed locally awaiting retest.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d524020afcb4bc02a24",
+      "group": 31,
+      "disposition": "fixed",
+      "files_changed": [
+        "Dockerfile",
+        "healthcheck.js",
+        "tests/healthcheck.test.js",
+        "tests/build-context.sh"
+      ],
+      "affected": [
+        "Dockerfile:77",
+        "healthcheck.js",
+        "GET /api/probes (loopback check only)"
+      ],
+      "verification": "No Dockerfile healthcheck existed at HEAD. Focused regression failed before implementation. Docker HEALTHCHECK now runs a bounded Node HTTP request to 127.0.0.1:$PORT/api/probes every 30s; 200 succeeds, 503 or refused connection fails. Regression and docker build --check pass; build-context test confirms the script is included. This is operational detection hardening, not proof of an independently exploitable vulnerability.",
+      "callback_action": null,
+      "remaining_action": "After authorized image build/deployment, inspect Config.Healthcheck and State.Health, verify healthy API and an isolated stopped/unresponsive API failure. Configure platform alert/recovery policy separately; request Provenby retest.",
+      "reason": "No Dockerfile healthcheck existed at HEAD. Focused regression failed before implementation. Docker HEALTHCHECK now runs a bounded Node HTTP request to 127.0.0.1:$PORT/api/probes every 30s; 200 succeeds, 503 or refused connection fails. Regression and docker build --check pass; build-context test confirms the script is included. This is operational detection hardening, not proof of an independently exploitable vulnerability.",
+      "callback_reason": "No Dockerfile healthcheck existed at HEAD. Focused regression failed before implementation. Docker HEALTHCHECK now runs a bounded Node HTTP request to 127.0.0.1:$PORT/api/probes every 30s; 200 succeeds, 503 or refused connection fails. Regression and docker build --check pass; build-context test confirms the script is included. This is operational detection hardening, not proof of an independently exploitable vulnerability.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713d5f7700d9a7cf3e774b",
+      "group": 31,
+      "disposition": "fixed",
+      "files_changed": [
+        "agent/Dockerfile",
+        "agent/agent.js",
+        "agent/healthcheck.js",
+        "agent/docker-compose.yml",
+        "agent/README.md",
+        "tests/healthcheck.test.js"
+      ],
+      "affected": [
+        "agent/Dockerfile:29",
+        "agent/agent.js:connect()",
+        "agent/healthcheck.js",
+        "agent/docker-compose.yml:13-15"
+      ],
+      "verification": "No agent Dockerfile healthcheck existed at HEAD. Focused regression failed before implementation. Agent now tracks successful welcome and pong freshness in /tmp and clears the marker at startup/rejection/disconnect. Docker check requires a heartbeat under 75s old; read-only Compose supplies /tmp tmpfs. Tests cover no session, valid session, stale/malformed marker, unregistered pongs, welcome, registered pongs, rejection and disconnect; all pass. Docker build --check passes. No inbound listener added.",
+      "callback_action": null,
+      "remaining_action": "After authorized build/deployment, verify healthy registration and stale/disconnected/rejected states; keep writable /tmp tmpfs for read-only containers. Docker restart unless-stopped alone does not recover unhealthy running processes; configure monitoring separately. Request Provenby retest.",
+      "reason": "No agent Dockerfile healthcheck existed at HEAD. Focused regression failed before implementation. Agent now tracks successful welcome and pong freshness in /tmp and clears the marker at startup/rejection/disconnect. Docker check requires a heartbeat under 75s old; read-only Compose supplies /tmp tmpfs. Tests cover no session, valid session, stale/malformed marker, unregistered pongs, welcome, registered pongs, rejection and disconnect; all pass. Docker build --check passes. No inbound listener added.",
+      "callback_reason": "No agent Dockerfile healthcheck existed at HEAD. Focused regression failed before implementation. Agent now tracks successful welcome and pong freshness in /tmp and clears the marker at startup/rejection/disconnect. Docker check requires a heartbeat under 75s old; read-only Compose supplies /tmp tmpfs. Tests cover no session, valid session, stale/malformed marker, unregistered pongs, welcome, registered pongs, rejection and disconnect; all pass. Docker build --check passes. No inbound listener added.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ee11793a23cd2966599",
+      "group": 32,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ec90cf0e949e1613508",
+      "group": 33,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee4a9e24bf71dbc48cd70",
+      "group": 34,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e141a6018165ae303504",
+      "group": 35,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee47f135fbf3f7578a5ca",
+      "group": 36,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed353b1823b134be5441a6",
+      "group": 37,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee45105f9233bc238359d",
+      "group": 38,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/history?id=... or ?host=...",
+        "server.js:history handler",
+        "README.md:How it works",
+        "public/app.js:history fetches"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js",
+        "README.md"
+      ],
+      "reason": "The documented query selector is target, not id, probe or host. Both frontend callers use target; absent target deliberately selects all configured public targets. Guessed parameters never enter DNS or a child-process sink. Two-target SQLite controls prove each supported target selects its own data and nonexistent target returns404, while id=fixture-a/id=nonexistent/probe/host=;id requests match the intentionally public all-target response. There is no authenticated per-probe boundary or demonstrated parameter injection.",
+      "verification": "tests/api-surface.test.js passes guessed-parameter, supported-selector, unknown-target and zero DNS/spawn controls.",
+      "remaining_action": "ignore callback for the demonstrated inapplicable parameter contract; use documented target selector. No alias or authentication change.",
+      "callback_action": "ignore",
+      "callback_reason": "The documented query selector is target, not id, probe or host. Both frontend callers use target; absent target deliberately selects all configured public targets. Guessed parameters never enter DNS or a child-process sink. Two-target SQLite controls prove each supported target selects its own data and nonexistent target returns404, while id=fixture-a/id=nonexistent/probe/host=;id requests match the intentionally public all-target response. There is no authenticated per-probe boundary or demonstrated parameter injection.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee4c89060c62db369aad8",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "public/app.js:11-17,190-229,326-331,515-552,685-745",
+        "public/overview.js:72-108",
+        "public/globe.js:193-208",
+        "public/mtr.js and public/graph.js (no innerHTML sinks)"
+      ],
+      "reason": "These are positive output-encoding observations, not vulnerability claims. Review of the named renderer files confirms externally influenced text is escaped or assigned via textContent; unescaped substitutions are fixed local constants, server-generated IDs, numeric computations, or validated numeric fields. Existing frontend-security tests exercise hostile catalog, reverse-DNS, agent, geographic and sovereignty strings plus normal display controls across app.js, overview.js and globe.js; all ten pass. mtr.js and graph.js have no innerHTML sink. This verifies the reported mitigation without claiming complete absence of unrelated XSS.",
+      "verification": "All 10 frontend-security.test.js tests passed with the minimal DOM fixture; this is output-level testing, not a full browser security audit.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 39,
+      "affected": [
+        "public/app.js:11-17,190-229,326-331,515-552,685-745",
+        "public/overview.js:72-108",
+        "public/globe.js:193-208",
+        "public/mtr.js and public/graph.js (no innerHTML sinks)"
+      ],
+      "callback_reason": "These are positive output-encoding observations, not vulnerability claims. Review of the named renderer files confirms externally influenced text is escaped or assigned via textContent; unescaped substitutions are fixed local constants, server-generated IDs, numeric computations, or validated numeric fields. Existing frontend-security tests exercise hostile catalog, reverse-DNS, agent, geographic and sovereignty strings plus normal display controls across app.js, overview.js and globe.js; all ten pass. mtr.js and graph.js have no innerHTML sink. This verifies the reported mitigation without claiming complete absence of unrelated XSS.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81edc38abd84f430c7657",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 40,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ecfa385aee6fedd12ec",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 41,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee3d75f772c2feaec8ca3",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "public/app.js",
+        "public/overview.js",
+        "public/index.html",
+        "public/ranking.html",
+        "public/ranking.css",
+        "public/sovereignty.html",
+        "public/sovereignty.css",
+        "public/styles.css",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /ranking",
+        "GET /sovereignty",
+        "server.js:csp"
+      ],
+      "reason": "Verified hardening gap, not demonstrated style injection: CSP previously allowed arbitrary inline CSS. Removed unsafe-inline, moved embedded page styles verbatim to same-origin CSS, replaced literal style attributes with classes, and applied dynamic colors via explicit DOM style properties. Existing escaping remains. Runtime direct property setters still work under style-src self.",
+      "verification": "tests/csp-review.test.js:35 failed before edits, passed after; Chromium rejected hostile style element and attribute, accepted direct DOM style property, rendered globe->graph->overview, vantage colors, ranking and sovereignty pages with zero CSP violations.",
+      "remaining_action": "After authorized deployment verify style-src self and switch globe/graph/overview, use MTR/sovereignty views, inspect dynamic colors and browser CSP console; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 42,
+      "affected": [],
+      "callback_reason": "Verified hardening gap, not demonstrated style injection: CSP previously allowed arbitrary inline CSS. Removed unsafe-inline, moved embedded page styles verbatim to same-origin CSS, replaced literal style attributes with classes, and applied dynamic colors via explicit DOM style properties. Existing escaping remains. Runtime direct property setters still work under style-src self.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e139b062ad77d862a4ac",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "public/app.js",
+        "public/overview.js",
+        "public/index.html",
+        "public/ranking.html",
+        "public/ranking.css",
+        "public/sovereignty.html",
+        "public/sovereignty.css",
+        "public/styles.css",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /ranking",
+        "GET /sovereignty",
+        "server.js:csp"
+      ],
+      "reason": "Verified hardening gap, not demonstrated style injection: CSP previously allowed arbitrary inline CSS. Removed unsafe-inline, moved embedded page styles verbatim to same-origin CSS, replaced literal style attributes with classes, and applied dynamic colors via explicit DOM style properties. Existing escaping remains. Runtime direct property setters still work under style-src self.",
+      "verification": "tests/csp-review.test.js:35 failed before edits, passed after; Chromium rejected hostile style element and attribute, accepted direct DOM style property, rendered globe->graph->overview, vantage colors, ranking and sovereignty pages with zero CSP violations.",
+      "remaining_action": "After authorized deployment verify style-src self and switch globe/graph/overview, use MTR/sovereignty views, inspect dynamic colors and browser CSP console; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 43,
+      "affected": [],
+      "callback_reason": "Verified hardening gap, not demonstrated style injection: CSP previously allowed arbitrary inline CSS. Removed unsafe-inline, moved embedded page styles verbatim to same-origin CSS, replaced literal style attributes with classes, and applied dynamic colors via explicit DOM style properties. Existing escaping remains. Runtime direct property setters still work under style-src self.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e12d9d83777baf4e9682",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "public/app.js",
+        "public/overview.js",
+        "public/index.html",
+        "public/ranking.html",
+        "public/ranking.css",
+        "public/sovereignty.html",
+        "public/sovereignty.css",
+        "public/styles.css",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /ranking",
+        "GET /sovereignty",
+        "server.js:csp"
+      ],
+      "reason": "Verified hardening gap, not demonstrated style injection: CSP previously allowed arbitrary inline CSS. Removed unsafe-inline, moved embedded page styles verbatim to same-origin CSS, replaced literal style attributes with classes, and applied dynamic colors via explicit DOM style properties. Existing escaping remains. Runtime direct property setters still work under style-src self.",
+      "verification": "tests/csp-review.test.js:35 failed before edits, passed after; Chromium rejected hostile style element and attribute, accepted direct DOM style property, rendered globe->graph->overview, vantage colors, ranking and sovereignty pages with zero CSP violations.",
+      "remaining_action": "After authorized deployment verify style-src self and switch globe/graph/overview, use MTR/sovereignty views, inspect dynamic colors and browser CSP console; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 44,
+      "affected": [],
+      "callback_reason": "Verified hardening gap, not demonstrated style injection: CSP previously allowed arbitrary inline CSS. Removed unsafe-inline, moved embedded page styles verbatim to same-origin CSS, replaced literal style attributes with classes, and applied dynamic colors via explicit DOM style properties. Existing escaping remains. Runtime direct property setters still work under style-src self.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee49e79f7d6314a994f52",
+      "group": 45,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed353f3f0dcc564701729c",
+      "group": 46,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed355032b4d8c3123fd0a1",
+      "group": 47,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee422a6e79c1e5cf195b7",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "tests/csp-review.test.js",
+        "tests/security-headers.test.js"
+      ],
+      "locations": [
+        "GET /robots.txt",
+        "GET /api/mtr",
+        "unmatched HTTP routes"
+      ],
+      "reason": "Verified recognizable Express fallback template, but no stack, version or private filesystem disclosure. Small hardening change returns plain text Not found for unmatched routes, preserving HTTP 404, Helmet headers and default-src none CSP. It also removes request-path reflection. The scan claim that Cannot POST proves a POST-only route is incorrect: /api/mtr is not registered; MTR uses WebSocket messages.",
+      "verification": "Before generic-error edit, tests/csp-review.test.js had 3 pass/1 fail because /robots.txt returned Cannot GET; after edit the focused 16-test suite and real Chromium test passed. Existing /api/probes positive control remains 200.",
+      "remaining_action": "After authorized deployment GET /robots.txt and GET/POST /api/mtr should return 404 plain text Not found, no framework/version/stack/path reflection; existing API routes should still work. Request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 48,
+      "affected": [],
+      "callback_reason": "Verified recognizable Express fallback template, but no stack, version or private filesystem disclosure. Small hardening change returns plain text Not found for unmatched routes, preserving HTTP 404, Helmet headers and default-src none CSP. It also removes request-path reflection. The scan claim that Cannot POST proves a POST-only route is incorrect: /api/mtr is not registered; MTR uses WebSocket messages.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ed33c86d1b75f303b63",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 49,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed3536ec86a5d906baf189",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 50,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee494dee2390674f88757",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 51,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed354744c288eaf59c0482",
+      "group": 52,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee39e986a2f243b375af1",
+      "group": 53,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193b81ed8ab4a0135954ba1a6",
+      "group": 54,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET/POST guessed /api/mtr routes and listed /api/* discovery paths",
+        "WebSocket / with type=mtr",
+        "server.js:wss connection, startDistributed, startMtr"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "verification": "tests/api-surface.test.js passes 404 route map plus actual WebSocket command/private-IP negative and public-IP control cases; only one stubbed spawn, no DNS.",
+      "remaining_action": "ignore callback for inapplicable discovery-only result; future MTR scans must exercise the WebSocket protocol. Separate Origin finding remains awaiting retest.",
+      "callback_action": "ignore",
+      "callback_reason": "This result records unsuccessful endpoint discovery rather than a vulnerability. Current routes and frontend show MTR is a type=mtr WebSocket message, not a REST /api/mtr handler. All 28 listed GET guesses and three POST variants are404 locally; /api/probes and /api/history controls are200. The actual message path validates host syntax and public IPs then spawns mtr with an argument array and --. Local WebSocket controls reject 8.8.8.8;id,127.0.0.1,10.0.0.1,::1 and accept a public target using a stubbed process. This disproves an issue at the guessed REST paths, not every possible MTR vulnerability or the completeness of the old scan.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e129d9fbf78f808a61a7",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "tests/csp-review.test.js",
+        "tests/security-headers.test.js"
+      ],
+      "locations": [
+        "GET /robots.txt",
+        "GET /api/mtr",
+        "unmatched HTTP routes"
+      ],
+      "reason": "Verified recognizable Express fallback template, but no stack, version or private filesystem disclosure. Small hardening change returns plain text Not found for unmatched routes, preserving HTTP 404, Helmet headers and default-src none CSP. It also removes request-path reflection. The scan claim that Cannot POST proves a POST-only route is incorrect: /api/mtr is not registered; MTR uses WebSocket messages.",
+      "verification": "Before generic-error edit, tests/csp-review.test.js had 3 pass/1 fail because /robots.txt returned Cannot GET; after edit the focused 16-test suite and real Chromium test passed. Existing /api/probes positive control remains 200.",
+      "remaining_action": "After authorized deployment GET /robots.txt and GET/POST /api/mtr should return 404 plain text Not found, no framework/version/stack/path reflection; existing API routes should still work. Request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 55,
+      "affected": [],
+      "callback_reason": "Verified recognizable Express fallback template, but no stack, version or private filesystem disclosure. Small hardening change returns plain text Not found for unmatched routes, preserving HTTP 404, Helmet headers and default-src none CSP. It also removes request-path reflection. The scan claim that Cannot POST proves a POST-only route is incorrect: /api/mtr is not registered; MTR uses WebSocket messages.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e124e9d0875dfb28348a",
+      "disposition": "fixed",
+      "files_changed": [
+        "server.js",
+        "package.json",
+        "package-lock.json",
+        "public/index.html",
+        "tests/csp-review.test.js",
+        "tests/browser-csp.cjs"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /mtr.js",
+        "GET /overview.js",
+        "GET /api/probes",
+        "server.js:csp",
+        "public/index.html:importmap"
+      ],
+      "reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "verification": "tests/csp-review.test.js:11 failed before edits, passed after; real Chromium blocked a hostile unpkg script under the emitted CSP and loaded the complete local Three.js module graph.",
+      "remaining_action": "Rebuild with npm ci; after authorized deployment load globe/graph/MTR and verify all Three.js imports use /vendor/three, no unpkg script allowance, fresh import-map nonce; request Provenby retest.",
+      "callback": "not sent: fixed code requires separate retest",
+      "group": 56,
+      "affected": [],
+      "callback_reason": "Verified policy hardening gap: current checkout allowed every unpkg.com script path, while its importmap loaded Three.js 0.160.0. Added the same exact version with npm integrity lock, served only browser module directories locally, and removed CDN script permission. No attacker injection entry point or CDN compromise was demonstrated. connect-src jsdelivr remains for non-executable world-atlas JSON in public/globe.js and public/mtr.js; it does not authorize scripts.",
+      "callback_action": null,
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e11f5dbc5c3aac9a7dcb",
+      "group": 57,
+      "disposition": "not reproducible",
+      "affected": [
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:parseConf, buildCatalog, publicAgent",
+        "probes.conf",
+        "README.md:Probe catalog / Community vantage points"
+      ],
+      "files_changed": [
+        "tests/api-surface.test.js"
+      ],
+      "reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "verification": "tests/api-surface.test.js verifies catalog origins, /api/probes and /api/targets equality, publicAgent privacy and zero external DNS/process activity.",
+      "remaining_action": "ignore callback for inapplicable infrastructure-disclosure claim; preserve intended public target catalog and agent privacy.",
+      "callback_action": "ignore",
+      "callback_reason": "The scanner conflates public measurement destinations with private volunteer vantage points. PROBES is built from the deliberately public checked-in probes.conf catalog, with public DNS/geolocation metadata; README explains adding public targets and rendering these fields. The separately authenticated agent registry passes through publicAgent, which omits home IP, token and raw ASN. Local catalog/alias controls match configured destinations and public-agent controls retain country/AS name but omit a synthetic home IP and token. No private inventory or confidentiality boundary bypass is demonstrated.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19225add5f29bc03c70028b98",
+      "group": 58,
+      "disposition": "fixed",
+      "files_changed": [
+        "tests/build-security.test.js"
+      ],
+      "affected": [
+        "Dockerfile:4"
+      ],
+      "verification": "Current HEAD already pins node:22.23.4-bookworm-slim to sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da. Docker build --check resolves that pinned reference without warnings. Source test accepts current FROM and rejects a tag-only control.",
+      "callback_action": null,
+      "remaining_action": "Existing implemented digest pin remains awaiting an appropriate Provenby retest of the current/deployed revision. Do not use ignore to bypass the required retest.",
+      "reason": "Current HEAD already pins node:22.23.4-bookworm-slim to sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da. Docker build --check resolves that pinned reference without warnings. Source test accepts current FROM and rejects a tag-only control.",
+      "callback_reason": "Current HEAD already pins node:22.23.4-bookworm-slim to sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da. Docker build --check resolves that pinned reference without warnings. Source test accepts current FROM and rejects a tag-only control.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19225ae44fcc6cb5ece55da2e",
+      "group": 58,
+      "disposition": "fixed",
+      "files_changed": [
+        "tests/build-security.test.js"
+      ],
+      "affected": [
+        "agent/Dockerfile:3"
+      ],
+      "verification": "Current HEAD already pins node:22.23.4-bookworm-slim to sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da. Docker build --check agent/ resolves that pinned reference without warnings. Source test accepts current FROM and rejects a tag-only control.",
+      "callback_action": null,
+      "remaining_action": "Existing implemented digest pin remains awaiting an appropriate Provenby retest of the current/deployed revision. Do not use ignore to bypass the required retest.",
+      "reason": "Current HEAD already pins node:22.23.4-bookworm-slim to sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da. Docker build --check agent/ resolves that pinned reference without warnings. Source test accepts current FROM and rejects a tag-only control.",
+      "callback_reason": "Current HEAD already pins node:22.23.4-bookworm-slim to sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e2078fd3b14d159fdb5c7279da. Docker build --check agent/ resolves that pinned reference without warnings. Source test accepts current FROM and rejects a tag-only control.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a193713cca8f57c426ea6a4761",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "server.js:494-495 (Express setup)",
+        "server.js:555-789 (HTTP routes)",
+        "server.js:838-872 (agent token handshake)"
+      ],
+      "reason": "This Express application has no cookie/session authentication or victim-specific authenticated HTTP state transitions. HTTP APIs are intentionally public catalog/history/ranking reads and a public rate-limited sovereignty scan; adding csurf does not supply a missing authenticated-session boundary. backend-controls confirms anonymous and arbitrary Cookie requests return the same public responses without Set-Cookie. The separate agent registration requires an explicit message token, rather than ambient browser credentials; browser WebSocket Origin enforcement is handled separately. The rule only detected absence of one middleware and its CSRF assumption is inapplicable.",
+      "verification": "backend-controls: public read APIs neither require nor create cookie authentication; passed. Source route/auth inventory reviewed.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 59,
+      "affected": [
+        "server.js:494-495 (Express setup)",
+        "server.js:555-789 (HTTP routes)",
+        "server.js:838-872 (agent token handshake)"
+      ],
+      "callback_reason": "This Express application has no cookie/session authentication or victim-specific authenticated HTTP state transitions. HTTP APIs are intentionally public catalog/history/ranking reads and a public rate-limited sovereignty scan; adding csurf does not supply a missing authenticated-session boundary. backend-controls confirms anonymous and arbitrary Cookie requests return the same public responses without Set-Cookie. The separate agent registration requires an explicit message token, rather than ambient browser credentials; browser WebSocket Origin enforcement is handled separately. The rule only detected absence of one middleware and its CSRF assumption is inapplicable.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed354c9394b671268dddda",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 60,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a1947ee4b5e24a20a44307e38c",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 61,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e13d85870f11c0b3bdaf",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 62,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e1354025a3b792eae6f6",
+      "disposition": "not reproducible",
+      "files_changed": [
+        "tests/csp-review.test.js"
+      ],
+      "locations": [
+        "GET /",
+        "GET /app.js",
+        "GET /api/probes",
+        "GET /api/targets",
+        "server.js:502-537"
+      ],
+      "reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "verification": "Focused 16-test CSP/header/frontend suite passed; real HTTP defensive-header controls in tests/csp-review.test.js:56 pass before and after code changes.",
+      "remaining_action": "No application vulnerability to fix for this positive-control result; retain tests. CDN/style findings are tracked separately.",
+      "callback_action": "ignore",
+      "callback": "pending parent submission",
+      "group": 63,
+      "affected": [],
+      "callback_reason": "This result describes positive controls, not a vulnerability. Re-read server.js csp() and Helmet middleware; tests/csp-review.test.js verifies real loopback HTML, JS and public JSON responses have HSTS, DENY, nosniff, no-referrer, same-origin COOP/CORP, disabled device permissions and CSP frame-ancestors none. X-Powered-By is absent. Existing security-headers.test.js also verifies random per-response import-map nonces and restrictive 404 CSP. Eight header test routes/controls run locally without DNS or probe processes; no production or edge claim is inferred.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a19395e1310d0572e0c2320f89",
+      "group": 64,
+      "disposition": "fixed",
+      "affected": [
+        "GET /api/history (including absent target and guessed id/probe/host parameters)",
+        "server.js:history handler",
+        "history-budget.js",
+        "GET /api/probes"
+      ],
+      "files_changed": [
+        "server.js",
+        "history-budget.js",
+        "tests/history-budget.test.js",
+        "tests/api-surface.test.js",
+        "tests/build-context.sh",
+        "README.md"
+      ],
+      "reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "verification": "Focused test failed before fix (second large request 200, expected429). After fix, budget tests pass. Real local SQLite fixture returns 11031257 bytes/80000 buckets, repeat429 Retry-After36, and selected-target137081bytes/1000buckets200; /api/probes remains200. Tests cover refill, map cap, trusted clients and direct XFF spoof rejection. No production load or confidentiality exploit claimed.",
+      "remaining_action": "After authorized deployment, run the staged controls below and request a separate Provenby retest. No callback for a fixed finding. Configure TRUST_PROXY for the actual proxy chain; use target to select data.",
+      "callback_action": null,
+      "callback_reason": "Public telemetry is intentional; the reported confidential-data exposure is not established. Output already had per-target bucket and finite catalog bounds, so it was not literally unbounded. Repeated multi-megabyte responses did lack a per-client cost budget. Added a 100000-potential-sample token budget refilling over one minute, admission before SQLite, a single-query work cap, a bounded 5000-client map, and 429/Retry-After. req.ip uses explicitly trusted proxy CIDRs; untrusted forwarded headers cannot select budget keys. The undocumented id/probe/host parameters remain ignored; target is the documented selector.",
+      "callback_outcome": "not sent: fixed code awaits separate Provenby retest",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    },
+    {
+      "result_id": "res_01a192ed354312ffc5a40c3ea0b0",
+      "disposition": "not reproducible",
+      "callback_action": "ignore",
+      "files_changed": [],
+      "evidence_refs": [
+        "public/app.js:11-17,190-229,326-331,515-552,685-745",
+        "public/overview.js:72-108",
+        "public/globe.js:193-208",
+        "public/mtr.js and public/graph.js (no innerHTML sinks)"
+      ],
+      "reason": "These are positive output-encoding observations, not vulnerability claims. Review of the named renderer files confirms externally influenced text is escaped or assigned via textContent; unescaped substitutions are fixed local constants, server-generated IDs, numeric computations, or validated numeric fields. Existing frontend-security tests exercise hostile catalog, reverse-DNS, agent, geographic and sovereignty strings plus normal display controls across app.js, overview.js and globe.js; all ten pass. mtr.js and graph.js have no innerHTML sink. This verifies the reported mitigation without claiming complete absence of unrelated XSS.",
+      "verification": "All 10 frontend-security.test.js tests passed with the minimal DOM fixture; this is output-level testing, not a full browser security audit.",
+      "remaining_action": "Record verified inapplicability; no vulnerability fix or production probe required.",
+      "group": 65,
+      "affected": [
+        "public/app.js:11-17,190-229,326-331,515-552,685-745",
+        "public/overview.js:72-108",
+        "public/globe.js:193-208",
+        "public/mtr.js and public/graph.js (no innerHTML sinks)"
+      ],
+      "callback_reason": "These are positive output-encoding observations, not vulnerability claims. Review of the named renderer files confirms externally influenced text is escaped or assigned via textContent; unescaped substitutions are fixed local constants, server-generated IDs, numeric computations, or validated numeric fields. Existing frontend-security tests exercise hostile catalog, reverse-DNS, agent, geographic and sovereignty strings plus normal display controls across app.js, overview.js and globe.js; all ten pass. mtr.js and graph.js have no innerHTML sink. This verifies the reported mitigation without claiming complete absence of unrelated XSS.",
+      "callback_outcome": "ignore callback HTTP 200 (2026-11-01); server accepted batch",
+      "evidence_revision": "1fa08b8897098dbd27c02894f25721061db6f539 plus uncommitted reviewed changes; symbol references are authoritative where line numbers shifted"
+    }
+  ],
+  "callback": {
+    "http_status": 200,
+    "action": "ignore",
+    "item_count": 41,
+    "at": "2026-11-01T05:31:54.271180+00:00",
+    "fixed_callback_count": 0,
+    "accepted_callback_count": 0
+  },
+  "limitations": [
+    "No commit, deployment, production probe or Provenby retest was performed.",
+    "Fixed includes four already implemented fixes at initial HEAD: history DoS, WebSocket Origin validation, and both Docker image digests. They remain open awaiting retest.",
+    "Full Docker image build/runtime was not run. Docker static checks and isolated scratch COPY build plus executable local healthcheck tests passed.",
+    "Production TLS ingress and backend privacy are unverified. Configure exact TRUST_PROXY intermediary IP/CIDRs before deploying; otherwise all visitors behind an edge share one history budget and share URLs use the backend HTTP protocol.",
+    "History limits are per-process and per-client, based on potential sample count, not an absolute byte or fleet-wide quota. Legitimate multi-megabyte responses remain supported. Worker concurrency/deadlines bound database admission, not every possible distributed abuse scenario.",
+    "Chromium tests exercise the local real application with network/DNS/probe isolation and block non-loopback page traffic; they do not validate production GeoIP data or external map availability.",
+    "Node SQLite experimental and VM cross-realm Promise deprecation warnings remain; no failing baseline tests were found."
+  ],
+  "post_deployment_retest": [
+    "Before release, record the deployed revision and both image digests. Configure TRUST_PROXY with the actual trusted proxy IP/CIDRs, require the edge to overwrite untrusted forwarding headers, and confirm backend3000 is private. Verify public HTTP redirects to HTTPS and browser WebSocket upgrades preserve Host/protocol. Do this only after authorization.",
+    "In isolated staging with a representative retained SQLite database, request one known target with buckets20, then buckets999999999 and the wide from0/to99999999999999 range. Output must stay at most1000buckets per target or return bounded429/503; invalid/nonfinite/reversed ranges must400. Concurrently poll /api/probes and observe live WebSocket messages; they must remain responsive. Exercise more than8 pending reads and five-second queue-inclusive deadlines with controlled staged load; verify Retry-After5 and recovery. Do not run expensive load on production.",
+    "In staging using80 fixture targets and1000 buckets, expect first whole-catalog request200, immediate repeat429 with Retry-After, and a single-target request200. Wait the advertised delay and confirm refill. Repeat from an untrusted direct peer with changing X-Forwarded-For and confirm it cannot obtain another budget; behind the configured proxy verify genuinely distinct clients get independent budgets. id/probe/host are ignored, documented target selects data, unknown target404.",
+    "Test staged WebSocket / upgrades with exact same-origin, attacker Origin, null and malformed Origin: same-origin101; other explicit origins403. Native no-Origin101 remains intentional. Send safe control MTR in staging only; injection/private-IP targets must be rejected before a probe process. /agent must reject invalid local-fixture hello tokens.",
+    "Open /, /ranking and /sovereignty in a browser. CSP script-src must contain only self and the fresh import-map nonce; style-src self; no unpkg script permission or unsafe-inline styles. Check local/vendor/three modules, graph/globe/overview and dynamic colors, no CSP violations. An isolated injected style block/attribute and unpkg script control must be blocked. Map JSON connections to jsDelivr remain intentional.",
+    "Verify known routes200 and unknown GET/POST routes404 with exact text Not found and restrictive error CSP; no framework/path reflection. Inspect main/agent image Config.Healthcheck and State.Health. Server should be healthy on API200, unhealthy on isolated unresponsive/error state. Agent needs writable/tmp; welcome/pongs healthy, rejection/disconnect or heartbeat older75seconds unhealthy. Configure alert/recovery policy separately.",
+    "Request separate appropriate Provenby code/web retests against the deployed revision for all32fixed IDs. The41ignore callbacks already returnedHTTP200. Leave the HTTP/TLS ID needs information until deployment evidence and an authorized ingress retest establish its disposition."
+  ],
+  "reviewed_file_sha256": {
+    "Dockerfile": "f3b2c85e9f5cbb0792bc696a05b5c4381320d9b47eff9440f0b1d50e9a753be9",
+    "README.md": "ae99e0628b84c578edb8217454b9e8fff19576920e39b8c0c847523d620202b7",
+    "agent/Dockerfile": "862d48514894f81d588cd7085c06c3a770adc341d1ee5d722a7d50052b20ec41",
+    "agent/README.md": "53a7c889811aceb9afbb13f51405db969c08f25f858a1c96f4c4e419e0e2d81b",
+    "agent/agent.js": "842d8df935edf2c0f2b183c56b39825eead6c3b4b9a4d4a4a577643f27817890",
+    "agent/docker-compose.yml": "f8d4531084d9b1128cec1e8ce507c6afeb0aaf2b4088732f02dc37a1d593a5d4",
+    "agent/healthcheck.js": "6c096573f409c433c7fc4434da0f89844aecbdc0f556c8bdc6f5fe80f21248dc",
+    "healthcheck.js": "8eb440a9c92f672747fd8609c9313a53d52cfadcee2adc1d7936df06a3736829",
+    "history-budget.js": "13b7fc56d7c0d4fdce9c850a3972a362bd9bc574be89680383bc02bf5b808bd1",
+    "history-reader.js": "c20eba76b6bc4c835eb86b53e0ed5b2667128f1d1a233bfd2169e1e46922eb2a",
+    "history-worker.js": "344c71752c85c20a7dade3b4f8ffaf494ab05624d4dc0e634ca677f7cacb6519",
+    "package-lock.json": "d81a983722565597b8e30226e19ae31e6866c0c04191eebad064d8f4b35d190e",
+    "package.json": "5d231fe1f02dbcb6ee944c8f9877e62f45c5a921672a01ad0efb970a6b889a95",
+    "probes.conf": "f8220430b1627a39c252bc5ad7a06d6efd8550e0c12fde7d6256879a49cbc2f4",
+    "public/app.js": "2a43104957e5c6e5377c1ca28659f2849b219f6c9d62914c46e9c4b65f213985",
+    "public/index.html": "b5f6c223b615ec52737c3e58b9a7757434012add981b8b62ba18d406d90c3182",
+    "public/overview.js": "ab633f09e53eaac096fd144ddecf4221cc44f2b117932fa4cee9867666b64404",
+    "public/ranking.css": "4a6a710568f55683ece0690a70eba6e68030439728fbc7493799f106dcc0c5a6",
+    "public/ranking.html": "c3d0f5d6fcd926d3aa3f25f3c8c5e5fbcab52421c501ea4bd6319e2853427985",
+    "public/sovereignty.css": "87cd37bcb3cbb22e09ffdaac7b4ab8e8cad310239521c6f6c178f889eab7f848",
+    "public/sovereignty.html": "143a9d016a617695e8855caf967c5c7750df7778c7368ddfd6f6c0094312773a",
+    "public/styles.css": "6d774628b012806e6cdbf3b67ea161a21d1b47c4d55875446bf8c3aa5a609265",
+    "server.js": "414782fcd92e69d851b5581ac7f1f8b5629751d0a930d4eb5b95ad88c91beab1",
+    "tests/api-surface.test.js": "77210ec71f3776c81bd6007a23417446bc9deacb8cb08520bca8e0fe529c862e",
+    "tests/browser-csp.cjs": "e5ca551cd2592b4fec57964a3831091f5856eecee02d04844b7327c2f9aaeaee",
+    "tests/build-context.sh": "f7ff667240cb27671a0dee459d146ec022bd3ffac2e18fc4c6716865174291f0",
+    "tests/build-security.test.js": "f9b5d2fccdcf17b0fae46e41e6333b28307f35a3124470020042d900e2390be5",
+    "tests/csp-review.test.js": "3216f3de93c4f6cdea26a76da264c792973fdd3fe08175537658b13db72cae17",
+    "tests/healthcheck.test.js": "371056ce1d9b90d3121d74fd777253f640ed683867df0e0c6ebd6e61276a28a2",
+    "tests/history-budget.test.js": "71bf278272b735f1d17dd6b20f77398a01b66fb22eee24ecf46bc2914d5bf383",
+    "tests/security-headers.test.js": "a0d4e8ab43144bbab9765832cf64352382e6a82f1ab29bfdad55edcb7664db8c",
+    "tests/source-review.test.js": "1606e1cdc235391532d5a673dc139cdc9683941ef4d620c08b45a0be8d3e8a2f"
+  }
+}

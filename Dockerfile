@@ -74,4 +74,6 @@ VOLUME ["/data"]
 EXPOSE 3000
 USER node
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=60s --retries=3 CMD ["node", "healthcheck.js"]
+
 CMD ["npm", "start"]

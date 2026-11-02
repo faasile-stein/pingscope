@@ -1,8 +1,7 @@
 'use strict';
-const { parentPort, workerData } = require('node:worker_threads');
 const { DatabaseSync } = require('node:sqlite');
 
-const db = new DatabaseSync(workerData.dbPath, { readOnly: true });
+const db = new DatabaseSync(process.argv[2], { readOnly: true });
 const bucketStmt = db.prepare(`
   SELECT
     CAST((t - $from) / $bucket AS INTEGER) AS b,
@@ -14,7 +13,7 @@ const bucketStmt = db.prepare(`
   GROUP BY b ORDER BY b
 `);
 
-parentPort.on('message', ({ ids, from, to, bucket }) => {
+process.on('message', ({ ids, from, to, bucket }) => {
   try {
     const targets = {};
     for (const tid of ids) {
@@ -24,8 +23,12 @@ parentPort.on('message', ({ ids, from, to, bucket }) => {
         loss: r.loss, sent: r.sent, recv: r.recv, n: r.n, samples: [],
       }));
     }
-    parentPort.postMessage({ targets });
+    if (process.connected) process.send({ targets });
   } catch {
-    parentPort.postMessage({ error: true });
+    if (process.connected) process.send({ error: true });
   }
 });
+
+// An idle child must not survive a disconnected parent. Normal shutdown and
+// request deadlines also send SIGKILL so native calls cannot delay retirement.
+process.on('disconnect', () => { db.close(); process.exit(0); });

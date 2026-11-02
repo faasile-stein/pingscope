@@ -13,8 +13,8 @@ test('real application responses already provide CSP, HSTS and framing protectio
     const csp = response.headers.get('content-security-policy');
     assert.ok(csp, `${route}: CSP present`);
     if (response.status === 404) {
-      // Express finalhandler replaces the policy with its stricter error-page
-      // policy; Helmet's DENY header still prevents framing.
+      // Generic errors keep a strict policy; Helmet's DENY header also
+      // prevents framing.
       assert.equal(csp, "default-src 'none'");
     } else {
       assert.ok(csp.includes("frame-ancestors 'none'"), route);

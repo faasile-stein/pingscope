@@ -20,7 +20,7 @@ function message(ws) {
 }
 
 test('browser WebSocket rejects foreign, null and malformed origins; same-site and native clients still connect', async (t) => {
-  const f = await backendFixture();
+  const f = await backendFixture({ env: { TRUST_PROXY: 'loopback' } });
   t.after(() => f.close());
   for (const origin of ['https://attacker.invalid', 'null', f.base + '/injected', 'file:///tmp/example']) {
     const result = await connect(f.base, { origin });
@@ -48,7 +48,7 @@ test('browser WebSocket rejects foreign, null and malformed origins; same-site a
 });
 
 test('MTR rate limits isolate different client IPs and keep a same-IP cooldown across connections', async (t) => {
-  const f = await backendFixture();
+  const f = await backendFixture({ env: { TRUST_PROXY: 'loopback,192.0.2.1' } });
   t.after(() => f.close());
   const client = async (ip) => {
     const { ws } = await connect(f.base, { origin: f.base, headers: { 'X-Forwarded-For': ip + ', 192.0.2.1' } });
@@ -68,4 +68,14 @@ test('MTR rate limits isolate different client IPs and keep a same-IP cooldown a
   assert.match((await sameReply).error, /rate limited/);
   assert.equal(f.calls.spawn.length, 2);
   assert.ok(f.calls.spawn.every((c) => c.command === 'mtr'));
+});
+
+test('untrusted upgrade peers cannot select HTTPS using a forwarded protocol header', async (t) => {
+  const f = await backendFixture();
+  t.after(() => f.close());
+  const spoofed = await connect(f.base, { origin: f.base.replace('http:', 'https:'), headers: { 'X-Forwarded-Proto': 'https' } });
+  assert.equal(spoofed.status, 403);
+  const actual = await connect(f.base, { origin: f.base, headers: { 'X-Forwarded-Proto': 'https' } });
+  assert.equal(actual.status, 101);
+  actual.ws.terminate();
 });

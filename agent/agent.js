@@ -8,6 +8,7 @@
 const { spawn } = require('child_process');
 const net = require('net');
 const WebSocket = require('ws');
+const { markHealthy, clearHealth } = require('./healthcheck');
 
 const SERVER = process.env.PINGSCOPE_URL || 'wss://pingscope.net/agent';
 // Public community join token for pingscope.net. The agent is sandboxed (only
@@ -36,9 +37,15 @@ function isPublicIpv4(ip) {
 }
 
 function isPublicIpv6(ip) {
-  const a = ip.toLowerCase();
-  const mapped = a.match(/^::(?:ffff:)?(\d{1,3}(?:\.\d{1,3}){3})$/);
-  if (mapped) return isPublicIpv4(mapped[1]);                            // v4-mapped tail
+  // Match the server's checks for equivalent expanded/embedded notation.
+  let a;
+  try { a = new URL(`http://[${ip}]/`).hostname.slice(1, -1); }
+  catch { return false; }
+  const mapped = a.match(/^::(?:ffff:)?([a-f0-9]{1,4}):([a-f0-9]{1,4})$/);
+  if (mapped) {
+    const hi = parseInt(mapped[1], 16), lo = parseInt(mapped[2], 16);
+    return isPublicIpv4(`${hi >> 8}.${hi & 255}.${lo >> 8}.${lo & 255}`);
+  }
   if (a === '::' || a === '::1') return false;                          // unspecified, loopback
   const first = a.startsWith('::') ? 0 : parseInt(a.split(':')[0] || '0', 16);
   if (Number.isNaN(first)) return false;
@@ -100,6 +107,8 @@ function runMtr(ws, reqId, target) {
 
 // --- connection with auto-reconnect ---
 function connect() {
+  clearHealth();
+  let registered = false;
   const ws = new WebSocket(SERVER, { handshakeTimeout: 10_000, maxPayload: 256 * 1024 });
   let hb;
   ws.on('open', () => {
@@ -107,13 +116,19 @@ function connect() {
     send(ws, { type: 'hello', token: TOKEN, name: NAME, version: '1' });
     hb = setInterval(() => { if (ws.readyState === 1) ws.ping(); }, 25_000);
   });
+  ws.on('pong', () => { if (registered) markHealthy(); });
   ws.on('message', (raw) => {
     let m; try { m = JSON.parse(raw); } catch { return; }
-    if (m.type === 'welcome') console.log(`registered as ${m.id} — ${m.country || '?'} · ${m.asName || '?'}`);
-    else if (m.type === 'reject') { console.error('rejected:', m.reason); ws.close(); process.exitCode = 1; }
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return;
+    if (m.type === 'welcome') {
+      registered = true;
+      markHealthy();
+      console.log(`registered as ${m.id} — ${m.country || '?'} · ${m.asName || '?'}`);
+    }
+    else if (m.type === 'reject') { registered = false; clearHealth(); console.error('rejected:', m.reason); ws.close(); process.exitCode = 1; }
     else if (m.type === 'mtr') runMtr(ws, m.reqId, m.target);
   });
-  ws.on('close', () => { clearInterval(hb); console.log('disconnected; retrying in 5s'); setTimeout(connect, 5000); });
+  ws.on('close', () => { registered = false; clearHealth(); clearInterval(hb); console.log('disconnected; retrying in 5s'); setTimeout(connect, 5000); });
   ws.on('error', (e) => console.error('ws error:', e.message));
 }
 

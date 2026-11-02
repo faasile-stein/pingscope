@@ -1,9 +1,10 @@
 'use strict';
 const path = require('node:path');
-const { Worker } = require('node:worker_threads');
+const { fork } = require('node:child_process');
 
 // SQLite aggregation is synchronous. Keep it off the HTTP/WS event loop, and
 // admit only a bounded amount of work even when many clients request history.
+// A separate process lets SIGKILL interrupt native SQLite at the deadline.
 class HistoryReader {
   constructor(dbPath, { timeoutMs = 5000, maxPending = 8 } = {}) {
     this.dbPath = dbPath;
@@ -12,8 +13,14 @@ class HistoryReader {
     this.queue = [];
     this.active = null;
     this.worker = null;
+    this.workerClosed = null;
     this.stopping = null;
+    this.retiringWorker = null;
     this.closed = false;
+    this.onParentExit = () => {
+      try { (this.worker || this.retiringWorker)?.kill('SIGKILL'); } catch { /* already gone */ }
+    };
+    process.once('exit', this.onParentExit);
   }
 
   read(params) {
@@ -44,7 +51,11 @@ class HistoryReader {
     if (!this.worker) {
       let worker;
       try {
-        worker = new Worker(path.join(__dirname, 'history-worker.js'), { workerData: { dbPath: this.dbPath } });
+        worker = fork(path.join(__dirname, 'history-worker.js'), [this.dbPath], {
+          execArgv: ['--experimental-sqlite'],
+          serialization: 'advanced',
+          stdio: ['ignore', 'ignore', 'inherit', 'ipc'],
+        });
       } catch {
         for (const task of this.queue.splice(0)) {
           clearTimeout(task.timer);
@@ -53,6 +64,9 @@ class HistoryReader {
         return;
       }
       this.worker = worker;
+      // Register before any error/exit handlers: failed spawns can emit close
+      // without exit, and normal exit can precede stdio/IPC closure.
+      this.workerClosed = new Promise((resolve) => worker.once('close', resolve));
       worker.on('message', (message) => {
         if (this.worker !== worker || !this.active) return;
         const task = this.active;
@@ -64,25 +78,35 @@ class HistoryReader {
       });
       worker.on('error', () => this.restart(worker, new Error('history worker failed')));
       worker.on('exit', () => this.restart(worker, new Error('history worker exited')));
+      worker.on('close', () => this.restart(worker, new Error('history worker closed')));
     }
     const task = this.active = this.queue.shift();
-    try { this.worker.postMessage(task.params); }
-    catch { this.restart(this.worker, new Error('history query failed')); }
+    const worker = this.worker;
+    try { worker.send(task.params, (error) => { if (error) this.restart(worker, new Error('history query failed')); }); }
+    catch { this.restart(worker, new Error('history query failed')); }
   }
 
   restart(worker, error) {
-    if (this.worker !== worker) return;
+    if (!worker || this.worker !== worker) return;
+    const closed = this.workerClosed;
     this.worker = null;
+    this.workerClosed = null;
+    this.retiringWorker = worker;
     if (this.active) {
       clearTimeout(this.active.timer);
       this.active.reject(error);
       this.active = null;
     }
-    // Await termination before admitting another query: at most one worker.
-    this.stopping = worker.terminate().finally(() => {
+    // Wait for actual process closure before replacement: at most one SQLite
+    // reader, even while a timed-out native statement is being killed.
+    this.stopping = closed.finally(() => {
+      this.retiringWorker = null;
       this.stopping = null;
       this.runNext();
     });
+    if (worker.exitCode === null && worker.signalCode === null) {
+      try { worker.kill('SIGKILL'); } catch { /* close still releases the slot */ }
+    }
   }
 
   async close() {
@@ -94,6 +118,7 @@ class HistoryReader {
     }
     if (this.worker) this.restart(this.worker, error);
     await this.stopping;
+    process.removeListener('exit', this.onParentExit);
   }
 }
 module.exports = { HistoryReader };

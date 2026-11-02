@@ -8,6 +8,12 @@ Graph.init(canvas);
 Globe.init(document.getElementById('globe'), document.getElementById('globe-labels'));
 Overview.init(document.getElementById('overview'));
 
+// Keep the initial view hidden until the existing mode controls take over.
+document.querySelectorAll('.initially-hidden').forEach((el) => {
+  el.style.display = 'none';
+  el.classList.remove('initially-hidden');
+});
+
 // HTML-escape every dynamic value before it goes into innerHTML (prevents XSS
 // from probe/agent/reverse-DNS data).
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -199,7 +205,8 @@ function buildSelector() {
     }
     const tEl = document.createElement('div');
     tEl.className = 'sel-type'; tEl.dataset.type = type;
-    tEl.innerHTML = `<div class="sel-type-h" style="--c:${TYPE_COLOR[type]}">${type.toUpperCase()}<span class="sel-type-n">${inType.length}</span></div>`;
+    tEl.style.setProperty('--c', TYPE_COLOR[type]);
+    tEl.innerHTML = `<div class="sel-type-h">${type.toUpperCase()}<span class="sel-type-n">${inType.length}</span></div>`;
     for (const [cc, list] of byCC) {
       const g = document.createElement('div');
       g.className = 'sel-grp';
@@ -516,14 +523,17 @@ function renderVantages() {
   html += `<span class="vchip fixed" title="the PingScope server">◉ this server</span>`;
   for (const a of agents) {
     const fe = a.cc ? cc2flag(a.cc) : '🌐';
-    html += `<span class="vchip${state.vantages.has(a.id) ? ' on' : ''}" data-id="${a.id}" style="--c:${colorFor(a.id)}" title="${esc(a.asName || '')}">${fe} ${esc(a.country || '?')}${a.name ? ' · ' + esc(a.name) : ''}</span>`;
+    html += `<span class="vchip${state.vantages.has(a.id) ? ' on' : ''}" data-id="${a.id}" title="${esc(a.asName || '')}">${fe} ${esc(a.country || '?')}${a.name ? ' · ' + esc(a.name) : ''}</span>`;
   }
-  if (!agents.length) html += `<span class="vchip" style="pointer-events:none;opacity:.55">no community vantages online</span>`;
+  if (!agents.length) html += `<span class="vchip unavailable">no community vantages online</span>`;
   vantagesEl.innerHTML = html;
-  vantagesEl.querySelectorAll('.vchip[data-id]').forEach((chip) => chip.onclick = () => {
-    const id = chip.dataset.id;
-    state.vantages.has(id) ? state.vantages.delete(id) : state.vantages.add(id);
-    chip.classList.toggle('on');
+  vantagesEl.querySelectorAll('.vchip[data-id]').forEach((chip) => {
+    chip.style.setProperty('--c', colorFor(chip.dataset.id));
+    chip.onclick = () => {
+      const id = chip.dataset.id;
+      state.vantages.has(id) ? state.vantages.delete(id) : state.vantages.add(id);
+      chip.classList.toggle('on');
+    };
   });
 }
 renderVantages();
@@ -545,7 +555,7 @@ MtrMap.onHover = (info) => {
   // every interpolated value is passed through esc() before it reaches innerHTML
   // (rdns/geo strings are attacker/route-influenced; numbers are harmless no-ops)
   mtrTip.innerHTML =
-    (info.track && info.track.label ? `<div class="tip-row" style="margin-bottom:3px">${esc(info.track.label)}</div>` : '') +
+    (info.track && info.track.label ? `<div class="tip-row tip-track">${esc(info.track.label)}</div>` : '') +
     `<div class="tip-head"><span>#${esc(h.idx)} · ${esc(fe)} ${esc(country)}${esc(city)}</span><span class="tip-rt">${esc(f(h.last))}ms</span></div>` +
     `<div class="tip-name">${esc(name)}</div>` +
     (as ? `<div class="tip-as">${esc(as)}</div>` : '') +
@@ -702,7 +712,7 @@ function sovCategoryHtml(title, icon, key, cat, emptyMsg) {
   if (!cat) {
     return `<div class="sov-cat"><div class="sov-cat-h">${icon} ${title}</div><div class="sov-hop-wait">resolving…</div></div>`;
   }
-  const s = cat.done ? cat.score : null, color = sovColor(cat.done ? s : null);
+  const s = cat.done ? cat.score : null;
   const primaryIp = (cat.servers && cat.servers[0] && cat.servers[0].ip) || '';
   const servers = (cat.servers || []).map((sv) => {
     const ownerFlag = sv.ownerCc ? ccFlag(sv.ownerCc) : '';
@@ -717,8 +727,8 @@ function sovCategoryHtml(title, icon, key, cat, emptyMsg) {
       `</div></button>`;
   }).join('') || `<div class="sov-empty">no servers resolved</div>`;
   const scoreBlock = cat.done
-    ? `<div class="sov-score" style="color:${color}">${s == null ? '—' : s}<span class="sov-score-max">/100</span></div>
-       <div class="sov-badge2" style="color:${color};border-color:${color}">${sovLabel(s)}</div>`
+    ? `<div class="sov-score">${s == null ? '—' : s}<span class="sov-score-max">/100</span></div>
+       <div class="sov-badge2">${sovLabel(s)}</div>`
     : `<div class="sov-scoring">tracing route…</div>`;
   const transit = cat.done
     ? (cat.transit
@@ -741,6 +751,10 @@ function renderSov() {
   sovBody.innerHTML =
     sovCategoryHtml('Web', '🌐', 'web', sovScan.web, 'no web servers found') +
     sovCategoryHtml('Mail', '✉️', 'mail', sovScan.mail, `no mail servers (no MX record for ${sovScan.mailDomain || sovScan.domain || ''})`);
+  sovBody.querySelectorAll('[data-cat]').forEach((el) => {
+    const cat = sovScan[el.dataset.cat];
+    el.style.setProperty('--sov-color', sovColor(cat?.done ? cat.score : null));
+  });
   // wire click-through to the full MTR for every server row + header button
   sovBody.querySelectorAll('[data-ip]').forEach((el) => {
     el.onclick = () => { const ip = el.getAttribute('data-ip'); if (ip) openMtrFromSov(ip); };

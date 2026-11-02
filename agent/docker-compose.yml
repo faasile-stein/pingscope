@@ -10,6 +10,9 @@ services:
     cap_drop: ["ALL"]
     cap_add: ["NET_RAW"]
     read_only: true
+    # Volatile registration heartbeat for the container health check.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=1m
     environment:
       # public community join token for pingscope.net (preconfigured; override
       # only if you point PINGSCOPE_URL at your own server)

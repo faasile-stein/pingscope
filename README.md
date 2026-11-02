@@ -93,6 +93,9 @@ We'll review and add them. (Running your own instance? Just edit `probes.conf`.)
 - **Live feed** — samples stream to the browser over a WebSocket.
 - **History** — `GET /api/history?target=all&from=<ms>&to=<ms>&buckets=N` returns
   aggregated buckets for any past window; the "time machine" bar drives it.
+  `target` accepts one catalog ID, comma-separated IDs, or `all` (the default).
+  `id`, `probe`, and `host` are not history filters. Unknown `target` IDs return
+  404 if none match; responses always identify the selected targets.
 - **3D graph** — each target is a flowing lane: nested translucent percentile
   bands (the smoke) under a glowing median ribbon, with neon bloom. Drag to
   orbit, scroll to zoom, hover any point for exact stats.
@@ -144,6 +147,7 @@ the feature is simply off.
 | `AGENT_TOKEN`      | *(unset)*             | enables community agents; shared join token   |
 | `MAX_VANTAGES`     | `8`                   | max agents combined in one distributed MTR    |
 | `MAX_AGENTS`       | `300`                 | max simultaneously connected agents           |
+| `TRUST_PROXY`      | *(unset: none)*        | comma-separated trusted proxy IPs/CIDRs for forwarded HTTP/WebSocket client/protocol headers |
 
 ## Run without Docker (dev)
 
@@ -158,13 +162,35 @@ npm start
 
 ## Security regression checks
 
-History aggregation runs in one read-only SQLite worker, with at most eight
+History aggregation runs in one read-only SQLite child process, with at most eight
 pending requests and a five-second deadline including queue time. Overloaded
 or slow requests receive HTTP 503 with `Retry-After: 5`; other API and live-feed
 work remains on the main thread. Large valid history ranges may reach that
-deadline, so check representative retention volumes in staging. Worker
-termination can wait for a native SQLite statement to finish; no replacement
-worker starts until the old one exits.
+deadline, so check representative retention volumes in staging. At the deadline
+the parent kills the child with `SIGKILL`, including native SQLite work, and
+waits for process closure before starting a replacement. This keeps both request
+waiting and database execution bounded. Configure service shutdown to terminate
+the whole container/process group: abruptly terminating only the parent can
+bypass its JavaScript cleanup while native work is running.
+
+History also has a per-client budget of 100,000 potential returned samples,
+refilling over one minute. Cost is the number of selected targets multiplied
+by the maximum buckets in the requested range; small graph requests cost less
+than whole-catalog downloads. Exceeding the available budget returns HTTP 429
+with `Retry-After` before SQLite work starts. A single query exceeding 100,000
+samples returns 400; select fewer targets or buckets. The client-state map is
+capped at 5,000 entries and rejects new clients while full rather than evicting
+active limits. Public catalog access and the live feed remain available.
+
+Before deploying behind a proxy, set `TRUST_PROXY` to the exact intermediary
+IPs/CIDRs (including every trusted hop in its forwarded chain). For a proxy on
+the same host, `TRUST_PROXY=loopback` is sufficient. Keep the backend port
+private and have the edge overwrite client-supplied forwarding headers.
+Without this setting, HTTP and WebSocket budgets use the socket peer, and
+share URLs and Origin checks use the socket protocol: clients behind one proxy
+share a budget. Agent registration also uses this trusted client-IP lookup.
+The quickstart Compose port mapping is for direct local development; it does
+not configure a production TLS ingress or firewall.
 
 The browser WebSocket endpoint checks explicit Origins against the request's
 scheme and host. A TLS-terminating proxy must preserve `Host`, overwrite
@@ -172,6 +198,30 @@ scheme and host. A TLS-terminating proxy must preserve `Host`, overwrite
 Same-origin browsers and native clients without an Origin remain supported;
 `/agent` continues to authenticate its hello token. These checks do not turn
 the public API into an authenticated service.
+
+Live MTR admits at most eight sessions, including pending DNS and processes
+that are still stopping. Its shared per-client 20-second measurement cooldown
+is checked before DNS; changing untrusted forwarding headers cannot create a
+new client identity. Disconnecting or stopping a pending lookup prevents a
+later process launch. The cooldown map holds at most 5,000 clients.
+
+Public traces retain hop positions and measurements, but redact nonpublic
+transit IPs, reverse-DNS names and geographic details in local, community and
+sovereignty output. Destination validation covers equivalent IPv6 and embedded
+IPv4 notation on both server and agent. Non-object message frames are ignored
+by the server; community hop rows are normalized before enrichment. Ranking
+pagination truncates fractional page/size values before SQLite LIMIT/OFFSET.
+
+Three.js remains at version 0.160.0 and is served from the committed npm
+lockfile through `/vendor/three/`. CSP allows scripts from this origin and a
+fresh import-map nonce; styles come from local CSS files. Map JSON still comes
+from jsDelivr under `connect-src`, which does not authorize CDN scripts.
+
+Both images declare container health checks. The server checks HTTP liveness
+on loopback `/api/probes`; the agent checks recent registration/pong activity
+without opening a listener. Read-only agent deployments need the `/tmp` tmpfs
+shown in `agent/docker-compose.yml`. Configure platform alerts/recovery
+separately: Docker's restart policy alone does not restart an unhealthy process.
 
 Use Node 22.23.4, matching the application's pinned and tested runtime:
 
@@ -181,6 +231,8 @@ npm test
 docker build --check .
 docker build --check agent/
 bash tests/build-context.sh
+# Optional browser regression, using an already installed Chromium binary:
+PINGSCOPE_CHROMIUM=/path/to/chrome node --experimental-sqlite tests/browser-csp.cjs
 ```
 
 The tests use temporary databases, loopback HTTP/WebSocket listeners, local
@@ -190,6 +242,8 @@ with a minimal DOM fixture; they are not full browser tests.
 
 The security review's per-result evidence, callback outcomes, verification
 commands, and deployment retest instructions are in
-[`SECURITY-REVIEW.md`](SECURITY-REVIEW.md) and
-[`security-findings.json`](security-findings.json). Local fixes still require
+[`SECURITY-REVIEW.md`](SECURITY-REVIEW.md) and the current
+[`security-findings-2026-11-01-followup.json`](security-findings-2026-11-01-followup.json)
+ledger for all 112 results in the 20:19 UTC handoff. Earlier reviews remain in
+`security-findings-2026-11-01.json` and `security-findings.json`. Local fixes still require
 a separate Provenby retest after the reviewed revision is deployed.

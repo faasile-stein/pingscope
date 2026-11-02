@@ -26,6 +26,7 @@ async function backendFixture(options = {}) {
     child.stdout = new EventEmitter();
     child.stderr = new EventEmitter();
     child.kill = () => true;
+    options.onSpawn?.(child, command, args);
     return child;
   };
   const context = vm.createContext({

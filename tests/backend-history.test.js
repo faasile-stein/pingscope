@@ -134,9 +134,12 @@ test('HTTP history deadlines expire active and queued SQLite work while other AP
   t.diagnostic(`Both HTTP responses settled in ${responseMs.toFixed(1)}ms with a 50ms fixture deadline`);
   assert.equal(reader.queue.length, 0);
   assert.equal(reader.active, null);
-  // SQLite can finish a native call before termination settles; wait for the
-  // old worker before restoring the ordinary schema and checking recovery.
+  // The native query must actually stop at the deadline, not merely lose its
+  // waiting HTTP client. Wait for process closure before checking recovery.
   await reader.stopping;
+  const retiredMs = performance.now() - started;
+  t.diagnostic(`Native SQLite execution retired in ${retiredMs.toFixed(1)}ms after the request began`);
+  assert.ok(retiredMs < 500, `native SQLite work continued for ${retiredMs.toFixed(1)}ms after admission`);
   f.evaluate(`
     db.exec('DROP VIEW samples');
     db.exec('ALTER TABLE stored_samples RENAME TO samples');
